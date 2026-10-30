@@ -1,0 +1,48 @@
+# ══════════════════════════════════════════════════════════════
+# Health Insurance Pre-Authorization Desk — .gitignore
+# ══════════════════════════════════════════════════════════════
+
+# Secrets — NEVER COMMIT
+.env
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+.venv/
+venv/
+env/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# Vector index (rebuilt by ingest CLI)
+corpus/processed/
+
+# Frontend build
+frontend/node_modules/
+frontend/dist/
+
+# Docker volumes
+data/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Logs
+*.log
+logs/
+
+# Evaluation results (keep scenarios, not results)
+eval/results/*.json
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,3482 @@
+MANUAL LIVE DEMO GUIDE — 50 ADDITIONAL PRE-AUTH REQUESTS
+===============================================================
+
+RECOMMENDED WINDOWS + DOCKER COMMANDS
+--------------------------------------
+Open PowerShell in the project folder:
+
+  cd C:\Users\saira\OneDrive\Desktop\MLSDA_mini
+
+First-time setup / start:
+
+  docker compose up -d
+  docker compose ps
+  docker compose run --rm corpus-ingest
+  Start-Process http://localhost:3000/submit
+
+For later demos, use only `docker compose up -d` unless the stack is stopped.
+Do NOT run scripts\seed_demo_data.py for these 50 manual samples; that command
+is only for the original dashboard showcase records.
+
+SHOW THE DEMO IN THE BROWSER
+----------------------------
+1. Open http://localhost:3000/submit (the Start-Process command above does it).
+2. Enter one sample's patient, policy, hospital, and medical fields from below.
+3. Click Submit Pre-Authorization Request.
+4. The app navigates to the live status page for that request.
+5. Use the Dashboard link only for the original pre-seeded showcase records.
+
+RUN ONE SAMPLE DIRECTLY FROM POWERSHELL
+---------------------------------------
+Each sample below contains a complete copy/paste block. Copy the block under
+the sample you want, paste it into PowerShell, and press Enter. It POSTs one
+request, prints the run ID, and polls until the result is complete.
+
+If you prefer the UI, use the same JSON values as the form fields instead.
+
+STOP COMMANDS
+-------------
+Stop the demo containers but keep local volumes/data:
+
+  docker compose stop
+
+Stop and remove the containers/network (safe; volumes are kept):
+
+  docker compose down
+
+Optional full local reset (removes Redis/Postgres/Grafana/Prometheus volumes):
+
+  docker compose down -v
+
+
+
+SAMPLE 01 — DEMO-HYD-011 — Anusha Varma
+------------------------------------------------------------------------
+Expected route: approve-recommended
+Hospital: Apollo Hospitals Jubilee Hills (Hyderabad)
+Procedure: Laparoscopic appendicectomy
+Note: Emergency admission — initial waiting period waived; no specific procedure wait applies.
+
+Copy/paste this complete PowerShell block to run this one sample:
+
+$body = @'
+{
+  "request_id": "MANUAL-DEMO-HYD-011",
+  "patient": {
+    "patient_id": "PAT-HYD-001011",
+    "full_name": "Anusha Varma",
+    "date_of_birth": "1997-01-07",
+    "gender": "male",
+    "age_at_admission": 29
+  },
+  "policy": {
+    "policy_number": "SH-HYD-100011",
+    "policy_holder_name": "Anusha Varma",
+    "policy_inception_date": "2025-09-05",
+    "policy_expiry_date": "2027-07-14",
+    "sum_insured_inr": 500000,
+    "cumulative_bonus_inr": 0,
+    "prior_claims_inr": 0
+  },
+  "hospital": {
+    "hospital_id": "HOSP-HYD-001",
+    "hospital_name": "Apollo Hospitals Jubilee Hills",
+    "rohini_id": "ROH-HYD-10001",
+    "is_network_hospital": true,
+    "city": "Hyderabad",
+    "state": "Telangana"
+  },
+  "medical": {
+    "primary_diagnosis": "Acute appendicitis",
+    "icd10_code": "K35.8",
+    "procedure_name": "Laparoscopic appendicectomy",
+    "admission_date": "2026-10-30",
+    "expected_discharge_date": "2026-11-02",
+    "admission_type": "emergency",
+    "estimated_cost_inr": 87000,
+    "pre_existing_conditions": [],
+    "treating_physician": "Dr. Anil Menon, MS General Surgery"
+  },
+  "free_text_notes": "Emergency admission — initial waiting period waived; no specific procedure wait applies."
+}
+'@
+$response = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/v1/preauth" `
+  -ContentType "application/json" `
+  -Body $body
+$response | ConvertTo-Json -Depth 10
+
+# Save the returned run ID, then poll until the agent finishes.
+$runId = $response.run_id
+do {
+  Start-Sleep -Seconds 2
+  $status = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/preauth/$runId"
+  Write-Host "Status: $($status.status)"
+} while ($status.status -in @("pending", "processing"))
+$status | ConvertTo-Json -Depth 10
+
+
+
+SAMPLE 02 — DEMO-HYD-012 — Bhaskar Naidu
+------------------------------------------------------------------------
+Expected route: approve-recommended
+Hospital: Yashoda Hospitals Somajiguda (Hyderabad)
+Procedure: Laparoscopic cholecystectomy
+Note: Policy tenure exceeds the applicable waiting period; network cashless pathway available.
+
+Copy/paste this complete PowerShell block to run this one sample:
+
+$body = @'
+{
+  "request_id": "MANUAL-DEMO-HYD-012",
+  "patient": {
+    "patient_id": "PAT-HYD-001012",
+    "full_name": "Bhaskar Naidu",
+    "date_of_birth": "1983-02-10",
+    "gender": "female",
+    "age_at_admission": 43
+  },
+  "policy": {
+    "policy_number": "SH-HYD-100012",
+    "policy_holder_name": "Bhaskar Naidu",
+    "policy_inception_date": "2024-09-30",
+    "policy_expiry_date": "2027-07-21",
+    "sum_insured_inr": 300000,
+    "cumulative_bonus_inr": 50000,
+    "prior_claims_inr": 0
+  },
+  "hospital": {
+    "hospital_id": "HOSP-HYD-002",
+    "hospital_name": "Yashoda Hospitals Somajiguda",
+    "rohini_id": "ROH-HYD-10002",
+    "is_network_hospital": true,
+    "city": "Hyderabad",
+    "state": "Telangana"
+  },
+  "medical": {
+    "primary_diagnosis": "Symptomatic gallstones",
+    "icd10_code": "K80.2",
+    "procedure_name": "Laparoscopic cholecystectomy",
+    "admission_date": "2026-10-31",
+    "expected_discharge_date": "2026-11-02",
+    "admission_type": "planned_surgical",
+    "estimated_cost_inr": 110000,
+    "pre_existing_conditions": [
+      "Dyslipidemia"
+    ],
+    "treating_physician": "Dr. Meera Iyer, MS General Surgery"
+  },
+  "free_text_notes": "Policy tenure exceeds the applicable waiting period; network cashless pathway available."
+}
+'@
+$response = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/v1/preauth" `
+  -ContentType "application/json" `
+  -Body $body
+$response | ConvertTo-Json -Depth 10
+
+# Save the returned run ID, then poll until the agent finishes.
+$runId = $response.run_id
+do {
+  Start-Sleep -Seconds 2
+  $status = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/preauth/$runId"
+  Write-Host "Status: $($status.status)"
+} while ($status.status -in @("pending", "processing"))
+$status | ConvertTo-Json -Depth 10
+
+
+
+SAMPLE 03 — DEMO-HYD-013 — Charan Reddy
+------------------------------------------------------------------------
+Expected route: medical-review
+Hospital: KIMS Hospital Secunderabad (Hyderabad)
+Procedure: Lumbar microdiscectomy
+Note: Spinal procedure requires review of imaging, conservative treatment history, and medical necessity.
+
+Copy/paste this complete PowerShell block to run this one sample:
+
+$body = @'
+{
+  "request_id": "MANUAL-DEMO-HYD-013",
+  "patient": {
+    "patient_id": "PAT-HYD-001013",
+    "full_name": "Charan Reddy",
+    "date_of_birth": "1977-03-13",
+    "gender": "male",
+    "age_at_admission": 49
+  },
+  "policy": {
+    "policy_number": "SH-HYD-100013",
+    "policy_holder_name": "Charan Reddy",
+    "policy_inception_date": "2025-02-27",
+    "policy_expiry_date": "2027-07-28",
+    "sum_insured_inr": 500000,
+    "cumulative_bonus_inr": 0,
+    "prior_claims_inr": 0
+  },
+  "hospital": {
+    "hospital_id": "HOSP-HYD-003",
+    "hospital_name": "KIMS Hospital Secunderabad",
+    "rohini_id": "ROH-HYD-10003",
+    "is_network_hospital": true,
+    "city": "Hyderabad",
+    "state": "Telangana"
+  },
+  "medical": {
+    "primary_diagnosis": "Lumbar disc prolapse",
+    "icd10_code": "M51.2",
+    "procedure_name": "Lumbar microdiscectomy",
+    "admission_date": "2026-11-01",
+    "expected_discharge_date": "2026-11-05",
+    "admission_type": "planned_surgical",
+    "estimated_cost_inr": 270000,
+    "pre_existing_conditions": [
+      "Chronic low back pain"
+    ],
+    "treating_physician": "Dr. Nikhil Bhat, MS Orthopaedics"
+  },
+  "free_text_notes": "Spinal procedure requires review of imaging, conservative treatment history, and medical necessity."
+}
+'@
+$response = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/v1/preauth" `
+  -ContentType "application/json" `
+  -Body $body
+$response | ConvertTo-Json -Depth 10
+
+# Save the returned run ID, then poll until the agent finishes.
+$runId = $response.run_id
+do {
+  Start-Sleep -Seconds 2
+  $status = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/preauth/$runId"
+  Write-Host "Status: $($status.status)"
+} while ($status.status -in @("pending", "processing"))
+$status | ConvertTo-Json -Depth 10
+
+
+
+SAMPLE 04 — DEMO-HYD-014 — Deepa Mallik
+------------------------------------------------------------------------
+Expected route: medical-review
+Hospital: Care Hospitals Banjara Hills (Hyderabad)
+Procedure: Coronary angioplasty with stent
+Note: Emergency cardiac admission; verify policy activation, disclosure history, and clinical records.
+
+Copy/paste this complete PowerShell block to run this one sample:
+
+$body = @'
+{
+  "request_id": "MANUAL-DEMO-HYD-014",
+  "patient": {
+    "patient_id": "PAT-HYD-001014",
+    "full_name": "Deepa Mallik",
+    "date_of_birth": "1965-04-16",
+    "gender": "female",
+    "age_at_admission": 61
+  },
+  "policy": {
+    "policy_number": "SH-HYD-100014",
+    "policy_holder_name": "Deepa Mallik",
+    "policy_inception_date": "2026-08-01",
+    "policy_expiry_date": "2027-08-04",
+    "sum_insured_inr": 500000,
+    "cumulative_bonus_inr": 0,
+    "prior_claims_inr": 0
+  },
+  "hospital": {
+    "hospital_id": "HOSP-HYD-004",
+    "hospital_name": "Care Hospitals Banjara Hills",
+    "rohini_id": "ROH-HYD-10004",
+    "is_network_hospital": true,
+    "city": "Hyderabad",
+    "state": "Telangana"
+  },
+  "medical": {
+    "primary_diagnosis": "Acute myocardial infarction",
+    "icd10_code": "I21.9",
+    "procedure_name": "Coronary angioplasty with stent",
+    "admission_date": "2026-11-02",
+    "expected_discharge_date": "2026-11-07",
+    "admission_type": "emergency",
+    "estimated_cost_inr": 395000,
+    "pre_existing_conditions": [
+      "Hypertension",
+      "Type 2 Diabetes"
+    ],
+    "treating_physician": "Dr. Farah Khan, DM Cardiology"
+  },
+  "free_text_notes": "Emergency cardiac admission; verify policy activation, disclosure history, and clinical records."
+}
+'@
+$response = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/v1/preauth" `
+  -ContentType "application/json" `
+  -Body $body
+$response | ConvertTo-Json -Depth 10
+
+# Save the returned run ID, then poll until the agent finishes.
+$runId = $response.run_id
+do {
+  Start-Sleep -Seconds 2
+  $status = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/preauth/$runId"
+  Write-Host "Status: $($status.status)"
+} while ($status.status -in @("pending", "processing"))
+$status | ConvertTo-Json -Depth 10
+
+
+
+SAMPLE 05 — DEMO-HYD-015 — Eshwar Rao
+------------------------------------------------------------------------
+Expected route: approve-recommended
+Hospital: Star Hospitals Nanakramguda (Hyderabad)
+Procedure: Ureteroscopy with laser lithotripsy
+Note: Day-care urology procedure; policy tenure and hospital network status are satisfactory.
+
+Copy/paste this complete PowerShell block to run this one sample:
+
+$body = @'
+{
+  "request_id": "MANUAL-DEMO-HYD-015",
+  "patient": {
+    "patient_id": "PAT-HYD-001015",
+    "full_name": "Eshwar Rao",
+    "date_of_birth": "1989-05-19",
+    "gender": "male",
+    "age_at_admission": 37
+  },
+  "policy": {
+    "policy_number": "SH-HYD-100015",
+    "policy_holder_name": "Eshwar Rao",
+    "policy_inception_date": "2025-07-07",
+    "policy_expiry_date": "2027-08-11",
+    "sum_insured_inr": 300000,
+    "cumulative_bonus_inr": 0,
+    "prior_claims_inr": 45000
+  },
+  "hospital": {
+    "hospital_id": "HOSP-HYD-005",
+    "hospital_name": "Star Hospitals Nanakramguda",
+    "rohini_id": "ROH-HYD-10005",
+    "is_network_hospital": true,
+    "city": "Hyderabad",
+    "state": "Telangana"
+  },
+  "medical": {
+    "primary_diagnosis": "Ureteric calculus",
+    "icd10_code": "N20.0",
+    "procedure_name": "Ureteroscopy with laser lithotripsy",
+    "admission_date": "2026-11-03",
+    "expected_discharge_date": "2026-11-04",
+    "admission_type": "day_care",
+    "estimated_cost_inr": 150000,
+    "pre_existing_conditions": [],
+    "treating_physician": "Dr. Vivek Rangan, MCh Urology"
+  },
+  "free_text_notes": "Day-care urology procedure; policy tenure and hospital network status are satisfactory."
+}
+'@
+$response = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/v1/preauth" `
+  -ContentType "application/json" `
+  -Body $body
+$response | ConvertTo-Json -Depth 10
+
+# Save the returned run ID, then poll until the agent finishes.
+$runId = $response.run_id
+do {
+  Start-Sleep -Seconds 2
+  $status = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/preauth/$runId"
+  Write-Host "Status: $($status.status)"
+} while ($status.status -in @("pending", "processing"))
+$status | ConvertTo-Json -Depth 10
+
+
+
+SAMPLE 06 — DEMO-HYD-016 — Fathima Begum
+------------------------------------------------------------------------
+Expected route: medical-review
+Hospital: Fernandez Hospital Bogulkunta (Hyderabad)
+Procedure: Transurethral resection of prostate
+Note: Review age-specific disease waiting period and prior conservative management before approval.
+
+Copy/paste this complete PowerShell block to run this one sample:
+
+$body = @'
+{
+  "request_id": "MANUAL-DEMO-HYD-016",
+  "patient": {
+    "patient_id": "PAT-HYD-001016",
+    "full_name": "Fathima Begum",
+    "date_of_birth": "1959-06-22",
+    "gender": "male",
+    "age_at_admission": 67
+  },
+  "policy": {
+    "policy_number": "SH-HYD-100016",
+    "policy_holder_name": "Fathima Begum",
+    "policy_inception_date": "2025-05-18",
+    "policy_expiry_date": "2027-08-18",
+    "sum_insured_inr": 500000,
+    "cumulative_bonus_inr": 50000,
+    "prior_claims_inr": 0
+  },
+  "hospital": {
+    "hospital_id": "HOSP-HYD-006",
+    "hospital_name": "Fernandez Hospital Bogulkunta",
+    "rohini_id": "ROH-HYD-10006",
+    "is_network_hospital": true,
+    "city": "Hyderabad",
+    "state": "Telangana"
+  },
+  "medical": {
+    "primary_diagnosis": "Benign prostatic hyperplasia",
+    "icd10_code": "N40.1",
+    "procedure_name": "Transurethral resection of prostate",
+    "admission_date": "2026-10-30",
+    "expected_discharge_date": "2026-11-02",
+    "admission_type": "planned_surgical",
+    "estimated_cost_inr": 175000,
+    "pre_existing_conditions": [
+      "Hypertension"
+    ],
+    "treating_physician": "Dr. Suresh Rao, MCh Urology"
+  },
+  "free_text_notes": "Review age-specific disease waiting period and prior conservative management before approval."
+}
+'@
+$response = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/v1/preauth" `
+  -ContentType "application/json" `
+  -Body $body
+$response | ConvertTo-Json -Depth 10
+
+# Save the returned run ID, then poll until the agent finishes.
+$runId = $response.run_id
+do {
+  Start-Sleep -Seconds 2
+  $status = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/preauth/$runId"
+  Write-Host "Status: $($status.status)"
+} while ($status.status -in @("pending", "processing"))
+$status | ConvertTo-Json -Depth 10
+
+
+
+SAMPLE 07 — DEMO-HYD-017 — Girish Babu
+------------------------------------------------------------------------
+Expected route: approve-recommended
+Hospital: Gleneagles Global Hospitals LB Nagar (Hyderabad)
+Procedure: Laparoscopic hysterectomy
+Note: Waiting period is satisfied; obtain routine pre-operative reports and admission estimate.
+
+Copy/paste this complete PowerShell block to run this one sample:
+
+$body = @'
+{
+  "request_id": "MANUAL-DEMO-HYD-017",
+  "patient": {
+    "patient_id": "PAT-HYD-001017",
+    "full_name": "Girish Babu",
+    "date_of_birth": "1980-07-25",
+    "gender": "female",
+    "age_at_admission": 46
+  },
+  "policy": {
+    "policy_number": "SH-HYD-100017",
+    "policy_holder_name": "Girish Babu",
+    "policy_inception_date": "2024-08-11",
+    "policy_expiry_date": "2027-08-25",
+    "sum_insured_inr": 500000,
+    "cumulative_bonus_inr": 0,
+    "prior_claims_inr": 0
+  },
+  "hospital": {
+    "hospital_id": "HOSP-HYD-007",
+    "hospital_name": "Gleneagles Global Hospitals LB Nagar",
+    "rohini_id": "ROH-HYD-10007",
+    "is_network_hospital": true,
+    "city": "Hyderabad",
+    "state": "Telangana"
+  },
+  "medical": {
+    "primary_diagnosis": "Uterine leiomyoma",
+    "icd10_code": "D25.9",
+    "procedure_name": "Laparoscopic hysterectomy",
+    "admission_date": "2026-10-31",
+    "expected_discharge_date": "2026-11-03",
+    "admission_type": "planned_surgical",
+    "estimated_cost_inr": 225000,
+    "pre_existing_conditions": [
+      "Iron deficiency anaemia"
+    ],
+    "treating_physician": "Dr. Shalini Joseph, MD Obstetrics and Gynaecology"
+  },
+  "free_text_notes": "Waiting period is satisfied; obtain routine pre-operative reports and admission estimate."
+}
+'@
+$response = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/v1/preauth" `
+  -ContentType "application/json" `
+  -Body $body
+$response | ConvertTo-Json -Depth 10
+
+# Save the returned run ID, then poll until the agent finishes.
+$runId = $response.run_id
+do {
+  Start-Sleep -Seconds 2
+  $status = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/preauth/$runId"
+  Write-Host "Status: $($status.status)"
+} while ($status.status -in @("pending", "processing"))
+$status | ConvertTo-Json -Depth 10
+
+
+
+SAMPLE 08 — DEMO-HYD-018 — Harini Prasad
+------------------------------------------------------------------------
+Expected route: medical-review
+Hospital: Medicover Hospitals Hitec City (Hyderabad)
+Procedure: Inpatient pneumonia management
+Note: Policy is within the initial 30-day period; emergency admission requires clinical validation.
+
+Copy/paste this complete PowerShell block to run this one sample:
+
+$body = @'
+{
+  "request_id": "MANUAL-DEMO-HYD-018",
+  "patient": {
+    "patient_id": "PAT-HYD-001018",
+    "full_name": "Harini Prasad",
+    "date_of_birth": "1992-08-01",
+    "gender": "female",
+    "age_at_admission": 34
+  },
+  "policy": {
+    "policy_number": "SH-HYD-100018",
+    "policy_holder_name": "Harini Prasad",
+    "policy_inception_date": "2026-10-06",
+    "policy_expiry_date": "2027-09-01",
+    "sum_insured_inr": 300000,
+    "cumulative_bonus_inr": 0,
+    "prior_claims_inr": 0
+  },
+  "hospital": {
+    "hospital_id": "HOSP-HYD-008",
+    "hospital_name": "Medicover Hospitals Hitec City",
+    "rohini_id": "ROH-HYD-10008",
+    "is_network_hospital": true,
+    "city": "Hyderabad",
+    "state": "Telangana"
+  },
+  "medical": {
+    "primary_diagnosis": "Community-acquired pneumonia",
+    "icd10_code": "J18.9",
+    "procedure_name": "Inpatient pneumonia management",
+    "admission_date": "2026-11-01",
+    "expected_discharge_date": "2026-11-05",
+    "admission_type": "emergency",
+    "estimated_cost_inr": 98000,
+    "pre_existing_conditions": [
+      "Asthma"
+    ],
+    "treating_physician": "Dr. Ritu Sharma, MD Pulmonary Medicine"
+  },
+  "free_text_notes": "Policy is within the initial 30-day period; emergency admission requires clinical validation."
+}
+'@
+$response = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/v1/preauth" `
+  -ContentType "application/json" `
+  -Body $body
+$response | ConvertTo-Json -Depth 10
+
+# Save the returned run ID, then poll until the agent finishes.
+$runId = $response.run_id
+do {
+  Start-Sleep -Seconds 2
+  $status = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/preauth/$runId"
+  Write-Host "Status: $($status.status)"
+} while ($status.status -in @("pending", "processing"))
+$status | ConvertTo-Json -Depth 10
+
+
+
+SAMPLE 09 — DEMO-HYD-019 — Ishaan Mehta
+------------------------------------------------------------------------
+Expected route: query-to-hospital
+Hospital: Basavatarakam Cancer Hospital (Hyderabad)
+Procedure: Hip fracture fixation
+Note: Non-network admission — request emergency certificate, implant details, discharge summary, and original bills.
+
+Copy/paste this complete PowerShell block to run this one sample:
+
+$body = @'
+{
+  "request_id": "MANUAL-DEMO-HYD-019",
+  "patient": {
+    "patient_id": "PAT-HYD-001019",
+    "full_name": "Ishaan Mehta",
+    "date_of_birth": "1952-09-04",
+    "gender": "female",
+    "age_at_admission": 74
+  },
+  "policy": {
+    "policy_number": "SH-HYD-100019",
+    "policy_holder_name": "Ishaan Mehta",
+    "policy_inception_date": "2025-10-30",
+    "policy_expiry_date": "2027-09-08",
+    "sum_insured_inr": 500000,
+    "cumulative_bonus_inr": 0,
+    "prior_claims_inr": 0
+  },
+  "hospital": {
+    "hospital_id": "HOSP-HYD-009",
+    "hospital_name": "Basavatarakam Cancer Hospital",
+    "rohini_id": null,
+    "is_network_hospital": false,
+    "city": "Hyderabad",
+    "state": "Telangana"
+  },
+  "medical": {
+    "primary_diagnosis": "Fracture of neck of femur",
+    "icd10_code": "S72.0",
+    "procedure_name": "Hip fracture fixation",
+    "admission_date": "2026-11-02",
+    "expected_discharge_date": "2026-11-09",
+    "admission_type": "emergency",
+    "estimated_cost_inr": 325000,
+    "pre_existing_conditions": [
+      "Osteoporosis"
+    ],
+    "treating_physician": "Dr. Ajay Kulkarni, MS Orthopaedics"
+  },
+  "free_text_notes": "Non-network admission — request emergency certificate, implant details, discharge summary, and original bills."
+}
+'@
+$response = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/v1/preauth" `
+  -ContentType "application/json" `
+  -Body $body
+$response | ConvertTo-Json -Depth 10
+
+# Save the returned run ID, then poll until the agent finishes.
+$runId = $response.run_id
+do {
+  Start-Sleep -Seconds 2
+  $status = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/preauth/$runId"
+  Write-Host "Status: $($status.status)"
+} while ($status.status -in @("pending", "processing"))
+$status | ConvertTo-Json -Depth 10
+
+
+
+SAMPLE 10 — DEMO-HYD-020 — Jahnavi Rao
+------------------------------------------------------------------------
+Expected route: medical-review
+Hospital: Apollo Hospitals Jubilee Hills (Hyderabad)
+Procedure: Pars plana vitrectomy
+Note: Ophthalmic surgery requires retinal imaging, operative plan, and confirmation of covered indication.
+
+Copy/paste this complete PowerShell block to run this one sample:
+
+$body = @'
+{
+  "request_id": "MANUAL-DEMO-HYD-020",
+  "patient": {
+    "patient_id": "PAT-HYD-001020",
+    "full_name": "Jahnavi Rao",
+    "date_of_birth": "1968-10-07",
+    "gender": "male",
+    "age_at_admission": 58
+  },
+  "policy": {
+    "policy_number": "SH-HYD-100020",
+    "policy_holder_name": "Jahnavi Rao",
+    "policy_inception_date": "2024-12-09",
+    "policy_expiry_date": "2027-09-15",
+    "sum_insured_inr": 500000,
+    "cumulative_bonus_inr": 50000,
+    "prior_claims_inr": 45000
+  },
+  "hospital": {
+    "hospital_id": "HOSP-HYD-001",
+    "hospital_name": "Apollo Hospitals Jubilee Hills",
+    "rohini_id": "ROH-HYD-10001",
+    "is_network_hospital": true,
+    "city": "Hyderabad",
+    "state": "Telangana"
+  },
+  "medical": {
+    "primary_diagnosis": "Retinal detachment",
+    "icd10_code": "H33.2",
+    "procedure_name": "Pars plana vitrectomy",
+    "admission_date": "2026-11-03",
+    "expected_discharge_date": "2026-11-05",
+    "admission_type": "planned_surgical",
+    "estimated_cost_inr": 190000,
+    "pre_existing_conditions": [
+      "Type 2 Diabetes"
+    ],
+    "treating_physician": "Dr. Kavya Nair, DNB Ophthalmology"
+  },
+  "free_text_notes": "Ophthalmic surgery requires retinal imaging, operative plan, and confirmation of covered indication."
+}
+'@
+$response = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/v1/preauth" `
+  -ContentType "application/json" `
+  -Body $body
+$response | ConvertTo-Json -Depth 10
+
+# Save the returned run ID, then poll until the agent finishes.
+$runId = $response.run_id
+do {
+  Start-Sleep -Seconds 2
+  $status = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/preauth/$runId"
+  Write-Host "Status: $($status.status)"
+} while ($status.status -in @("pending", "processing"))
+$status | ConvertTo-Json -Depth 10
+
+
+
+SAMPLE 11 — DEMO-HYD-021 — Karthik Goud
+------------------------------------------------------------------------
+Expected route: approve-recommended
+Hospital: Yashoda Hospitals Somajiguda (Hyderabad)
+Procedure: Laparoscopic appendicectomy
+Note: Emergency admission — initial waiting period waived; no specific procedure wait applies.
+
+Copy/paste this complete PowerShell block to run this one sample:
+
+$body = @'
+{
+  "request_id": "MANUAL-DEMO-HYD-021",
+  "patient": {
+    "patient_id": "PAT-HYD-001021",
+    "full_name": "Karthik Goud",
+    "date_of_birth": "1997-11-10",
+    "gender": "male",
+    "age_at_admission": 29
+  },
+  "policy": {
+    "policy_number": "SH-HYD-100021",
+    "policy_holder_name": "Karthik Goud",
+    "policy_inception_date": "2025-09-05",
+    "policy_expiry_date": "2027-09-22",
+    "sum_insured_inr": 300000,
+    "cumulative_bonus_inr": 0,
+    "prior_claims_inr": 0
+  },
+  "hospital": {
+    "hospital_id": "HOSP-HYD-002",
+    "hospital_name": "Yashoda Hospitals Somajiguda",
+    "rohini_id": "ROH-HYD-10002",
+    "is_network_hospital": true,
+    "city": "Hyderabad",
+    "state": "Telangana"
+  },
+  "medical": {
+    "primary_diagnosis": "Acute appendicitis",
+    "icd10_code": "K35.8",
+    "procedure_name": "Laparoscopic appendicectomy",
+    "admission_date": "2026-10-30",
+    "expected_discharge_date": "2026-11-02",
+    "admission_type": "emergency",
+    "estimated_cost_inr": 77000,
+    "pre_existing_conditions": [],
+    "treating_physician": "Dr. Anil Menon, MS General Surgery"
+  },
+  "free_text_notes": "Emergency admission — initial waiting period waived; no specific procedure wait applies."
+}
+'@
+$response = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/v1/preauth" `
+  -ContentType "application/json" `
+  -Body $body
+$response | ConvertTo-Json -Depth 10
+
+# Save the returned run ID, then poll until the agent finishes.
+$runId = $response.run_id
+do {
+  Start-Sleep -Seconds 2
+  $status = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/preauth/$runId"
+  Write-Host "Status: $($status.status)"
+} while ($status.status -in @("pending", "processing"))
+$status | ConvertTo-Json -Depth 10
+
+
+
+SAMPLE 12 — DEMO-HYD-022 — Lavanya Sethi
+------------------------------------------------------------------------
+Expected route: approve-recommended
+Hospital: KIMS Hospital Secunderabad (Hyderabad)
+Procedure: Laparoscopic cholecystectomy
+Note: Policy tenure exceeds the applicable waiting period; network cashless pathway available.
+
+Copy/paste this complete PowerShell block to run this one sample:
+
+$body = @'
+{
+  "request_id": "MANUAL-DEMO-HYD-022",
+  "patient": {
+    "patient_id": "PAT-HYD-001022",
+    "full_name": "Lavanya Sethi",
+    "date_of_birth": "1983-12-13",
+    "gender": "female",
+    "age_at_admission": 43
+  },
+  "policy": {
+    "policy_number": "SH-HYD-100022",
+    "policy_holder_name": "Lavanya Sethi",
+    "policy_inception_date": "2024-09-30",
+    "policy_expiry_date": "2027-09-29",
+    "sum_insured_inr": 500000,
+    "cumulative_bonus_inr": 0,
+    "prior_claims_inr": 0
+  },
+  "hospital": {
+    "hospital_id": "HOSP-HYD-003",
+    "hospital_name": "KIMS Hospital Secunderabad",
+    "rohini_id": "ROH-HYD-10003",
+    "is_network_hospital": true,
+    "city": "Hyderabad",
+    "state": "Telangana"
+  },
+  "medical": {
+    "primary_diagnosis": "Symptomatic gallstones",
+    "icd10_code": "K80.2",
+    "procedure_name": "Laparoscopic cholecystectomy",
+    "admission_date": "2026-10-31",
+    "expected_discharge_date": "2026-11-02",
+    "admission_type": "planned_surgical",
+    "estimated_cost_inr": 120000,
+    "pre_existing_conditions": [
+      "Dyslipidemia"
+    ],
+    "treating_physician": "Dr. Meera Iyer, MS General Surgery"
+  },
+  "free_text_notes": "Policy tenure exceeds the applicable waiting period; network cashless pathway available."
+}
+'@
+$response = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/v1/preauth" `
+  -ContentType "application/json" `
+  -Body $body
+$response | ConvertTo-Json -Depth 10
+
+# Save the returned run ID, then poll until the agent finishes.
+$runId = $response.run_id
+do {
+  Start-Sleep -Seconds 2
+  $status = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/preauth/$runId"
+  Write-Host "Status: $($status.status)"
+} while ($status.status -in @("pending", "processing"))
+$status | ConvertTo-Json -Depth 10
+
+
+
+SAMPLE 13 — DEMO-HYD-023 — Manoj Pillai
+------------------------------------------------------------------------
+Expected route: medical-review
+Hospital: Care Hospitals Banjara Hills (Hyderabad)
+Procedure: Lumbar microdiscectomy
+Note: Spinal procedure requires review of imaging, conservative treatment history, and medical necessity.
+
+Copy/paste this complete PowerShell block to run this one sample:
+
+$body = @'
+{
+  "request_id": "MANUAL-DEMO-HYD-023",
+  "patient": {
+    "patient_id": "PAT-HYD-001023",
+    "full_name": "Manoj Pillai",
+    "date_of_birth": "1977-01-16",
+    "gender": "male",
+    "age_at_admission": 49
+  },
+  "policy": {
+    "policy_number": "SH-HYD-100023",
+    "policy_holder_name": "Manoj Pillai",
+    "policy_inception_date": "2025-02-27",
+    "policy_expiry_date": "2027-10-06",
+    "sum_insured_inr": 500000,
+    "cumulative_bonus_inr": 0,
+    "prior_claims_inr": 0
+  },
+  "hospital": {
+    "hospital_id": "HOSP-HYD-004",
+    "hospital_name": "Care Hospitals Banjara Hills",
+    "rohini_id": "ROH-HYD-10004",
+    "is_network_hospital": true,
+    "city": "Hyderabad",
+    "state": "Telangana"
+  },
+  "medical": {
+    "primary_diagnosis": "Lumbar disc prolapse",
+    "icd10_code": "M51.2",
+    "procedure_name": "Lumbar microdiscectomy",
+    "admission_date": "2026-11-01",
+    "expected_discharge_date": "2026-11-05",
+    "admission_type": "planned_surgical",
+    "estimated_cost_inr": 280000,
+    "pre_existing_conditions": [
+      "Chronic low back pain"
+    ],
+    "treating_physician": "Dr. Nikhil Bhat, MS Orthopaedics"
+  },
+  "free_text_notes": "Spinal procedure requires review of imaging, conservative treatment history, and medical necessity."
+}
+'@
+$response = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/v1/preauth" `
+  -ContentType "application/json" `
+  -Body $body
+$response | ConvertTo-Json -Depth 10
+
+# Save the returned run ID, then poll until the agent finishes.
+$runId = $response.run_id
+do {
+  Start-Sleep -Seconds 2
+  $status = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/preauth/$runId"
+  Write-Host "Status: $($status.status)"
+} while ($status.status -in @("pending", "processing"))
+$status | ConvertTo-Json -Depth 10
+
+
+
+SAMPLE 14 — DEMO-HYD-024 — Nandini Shah
+------------------------------------------------------------------------
+Expected route: medical-review
+Hospital: Star Hospitals Nanakramguda (Hyderabad)
+Procedure: Coronary angioplasty with stent
+Note: Emergency cardiac admission; verify policy activation, disclosure history, and clinical records.
+
+Copy/paste this complete PowerShell block to run this one sample:
+
+$body = @'
+{
+  "request_id": "MANUAL-DEMO-HYD-024",
+  "patient": {
+    "patient_id": "PAT-HYD-001024",
+    "full_name": "Nandini Shah",
+    "date_of_birth": "1965-02-19",
+    "gender": "female",
+    "age_at_admission": 61
+  },
+  "policy": {
+    "policy_number": "SH-HYD-100024",
+    "policy_holder_name": "Nandini Shah",
+    "policy_inception_date": "2026-08-01",
+    "policy_expiry_date": "2027-10-13",
+    "sum_insured_inr": 300000,
+    "cumulative_bonus_inr": 50000,
+    "prior_claims_inr": 0
+  },
+  "hospital": {
+    "hospital_id": "HOSP-HYD-005",
+    "hospital_name": "Star Hospitals Nanakramguda",
+    "rohini_id": "ROH-HYD-10005",
+    "is_network_hospital": true,
+    "city": "Hyderabad",
+    "state": "Telangana"
+  },
+  "medical": {
+    "primary_diagnosis": "Acute myocardial infarction",
+    "icd10_code": "I21.9",
+    "procedure_name": "Coronary angioplasty with stent",
+    "admission_date": "2026-11-02",
+    "expected_discharge_date": "2026-11-07",
+    "admission_type": "emergency",
+    "estimated_cost_inr": 385000,
+    "pre_existing_conditions": [
+      "Hypertension",
+      "Type 2 Diabetes"
+    ],
+    "treating_physician": "Dr. Farah Khan, DM Cardiology"
+  },
+  "free_text_notes": "Emergency cardiac admission; verify policy activation, disclosure history, and clinical records."
+}
+'@
+$response = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/v1/preauth" `
+  -ContentType "application/json" `
+  -Body $body
+$response | ConvertTo-Json -Depth 10
+
+# Save the returned run ID, then poll until the agent finishes.
+$runId = $response.run_id
+do {
+  Start-Sleep -Seconds 2
+  $status = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/preauth/$runId"
+  Write-Host "Status: $($status.status)"
+} while ($status.status -in @("pending", "processing"))
+$status | ConvertTo-Json -Depth 10
+
+
+
+SAMPLE 15 — DEMO-HYD-025 — Omkar Reddy
+------------------------------------------------------------------------
+Expected route: approve-recommended
+Hospital: Fernandez Hospital Bogulkunta (Hyderabad)
+Procedure: Ureteroscopy with laser lithotripsy
+Note: Day-care urology procedure; policy tenure and hospital network status are satisfactory.
+
+Copy/paste this complete PowerShell block to run this one sample:
+
+$body = @'
+{
+  "request_id": "MANUAL-DEMO-HYD-025",
+  "patient": {
+    "patient_id": "PAT-HYD-001025",
+    "full_name": "Omkar Reddy",
+    "date_of_birth": "1989-03-22",
+    "gender": "male",
+    "age_at_admission": 37
+  },
+  "policy": {
+    "policy_number": "SH-HYD-100025",
+    "policy_holder_name": "Omkar Reddy",
+    "policy_inception_date": "2025-07-07",
+    "policy_expiry_date": "2027-10-20",
+    "sum_insured_inr": 500000,
+    "cumulative_bonus_inr": 0,
+    "prior_claims_inr": 45000
+  },
+  "hospital": {
+    "hospital_id": "HOSP-HYD-006",
+    "hospital_name": "Fernandez Hospital Bogulkunta",
+    "rohini_id": "ROH-HYD-10006",
+    "is_network_hospital": true,
+    "city": "Hyderabad",
+    "state": "Telangana"
+  },
+  "medical": {
+    "primary_diagnosis": "Ureteric calculus",
+    "icd10_code": "N20.0",
+    "procedure_name": "Ureteroscopy with laser lithotripsy",
+    "admission_date": "2026-11-03",
+    "expected_discharge_date": "2026-11-04",
+    "admission_type": "day_care",
+    "estimated_cost_inr": 140000,
+    "pre_existing_conditions": [],
+    "treating_physician": "Dr. Vivek Rangan, MCh Urology"
+  },
+  "free_text_notes": "Day-care urology procedure; policy tenure and hospital network status are satisfactory."
+}
+'@
+$response = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/v1/preauth" `
+  -ContentType "application/json" `
+  -Body $body
+$response | ConvertTo-Json -Depth 10
+
+# Save the returned run ID, then poll until the agent finishes.
+$runId = $response.run_id
+do {
+  Start-Sleep -Seconds 2
+  $status = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/preauth/$runId"
+  Write-Host "Status: $($status.status)"
+} while ($status.status -in @("pending", "processing"))
+$status | ConvertTo-Json -Depth 10
+
+
+
+SAMPLE 16 — DEMO-HYD-026 — Pranavi Rao
+------------------------------------------------------------------------
+Expected route: medical-review
+Hospital: Gleneagles Global Hospitals LB Nagar (Hyderabad)
+Procedure: Transurethral resection of prostate
+Note: Review age-specific disease waiting period and prior conservative management before approval.
+
+Copy/paste this complete PowerShell block to run this one sample:
+
+$body = @'
+{
+  "request_id": "MANUAL-DEMO-HYD-026",
+  "patient": {
+    "patient_id": "PAT-HYD-001026",
+    "full_name": "Pranavi Rao",
+    "date_of_birth": "1959-04-25",
+    "gender": "male",
+    "age_at_admission": 67
+  },
+  "policy": {
+    "policy_number": "SH-HYD-100026",
+    "policy_holder_name": "Pranavi Rao",
+    "policy_inception_date": "2025-05-18",
+    "policy_expiry_date": "2027-10-27",
+    "sum_insured_inr": 500000,
+    "cumulative_bonus_inr": 0,
+    "prior_claims_inr": 0
+  },
+  "hospital": {
+    "hospital_id": "HOSP-HYD-007",
+    "hospital_name": "Gleneagles Global Hospitals LB Nagar",
+    "rohini_id": "ROH-HYD-10007",
+    "is_network_hospital": true,
+    "city": "Hyderabad",
+    "state": "Telangana"
+  },
+  "medical": {
+    "primary_diagnosis": "Benign prostatic hyperplasia",
+    "icd10_code": "N40.1",
+    "procedure_name": "Transurethral resection of prostate",
+    "admission_date": "2026-10-30",
+    "expected_discharge_date": "2026-11-02",
+    "admission_type": "planned_surgical",
+    "estimated_cost_inr": 185000,
+    "pre_existing_conditions": [
+      "Hypertension"
+    ],
+    "treating_physician": "Dr. Suresh Rao, MCh Urology"
+  },
+  "free_text_notes": "Review age-specific disease waiting period and prior conservative management before approval."
+}
+'@
+$response = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/v1/preauth" `
+  -ContentType "application/json" `
+  -Body $body
+$response | ConvertTo-Json -Depth 10
+
+# Save the returned run ID, then poll until the agent finishes.
+$runId = $response.run_id
+do {
+  Start-Sleep -Seconds 2
+  $status = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/preauth/$runId"
+  Write-Host "Status: $($status.status)"
+} while ($status.status -in @("pending", "processing"))
+$status | ConvertTo-Json -Depth 10
+
+
+
+SAMPLE 17 — DEMO-HYD-027 — Qasim Ali
+------------------------------------------------------------------------
+Expected route: approve-recommended
+Hospital: Medicover Hospitals Hitec City (Hyderabad)
+Procedure: Laparoscopic hysterectomy
+Note: Waiting period is satisfied; obtain routine pre-operative reports and admission estimate.
+
+Copy/paste this complete PowerShell block to run this one sample:
+
+$body = @'
+{
+  "request_id": "MANUAL-DEMO-HYD-027",
+  "patient": {
+    "patient_id": "PAT-HYD-001027",
+    "full_name": "Qasim Ali",
+    "date_of_birth": "1980-05-01",
+    "gender": "female",
+    "age_at_admission": 46
+  },
+  "policy": {
+    "policy_number": "SH-HYD-100027",
+    "policy_holder_name": "Qasim Ali",
+    "policy_inception_date": "2024-08-11",
+    "policy_expiry_date": "2027-11-03",
+    "sum_insured_inr": 300000,
+    "cumulative_bonus_inr": 0,
+    "prior_claims_inr": 0
+  },
+  "hospital": {
+    "hospital_id": "HOSP-HYD-008",
+    "hospital_name": "Medicover Hospitals Hitec City",
+    "rohini_id": "ROH-HYD-10008",
+    "is_network_hospital": true,
+    "city": "Hyderabad",
+    "state": "Telangana"
+  },
+  "medical": {
+    "primary_diagnosis": "Uterine leiomyoma",
+    "icd10_code": "D25.9",
+    "procedure_name": "Laparoscopic hysterectomy",
+    "admission_date": "2026-10-31",
+    "expected_discharge_date": "2026-11-03",
+    "admission_type": "planned_surgical",
+    "estimated_cost_inr": 235000,
+    "pre_existing_conditions": [
+      "Iron deficiency anaemia"
+    ],
+    "treating_physician": "Dr. Shalini Joseph, MD Obstetrics and Gynaecology"
+  },
+  "free_text_notes": "Waiting period is satisfied; obtain routine pre-operative reports and admission estimate."
+}
+'@
+$response = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/v1/preauth" `
+  -ContentType "application/json" `
+  -Body $body
+$response | ConvertTo-Json -Depth 10
+
+# Save the returned run ID, then poll until the agent finishes.
+$runId = $response.run_id
+do {
+  Start-Sleep -Seconds 2
+  $status = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/preauth/$runId"
+  Write-Host "Status: $($status.status)"
+} while ($status.status -in @("pending", "processing"))
+$status | ConvertTo-Json -Depth 10
+
+
+
+SAMPLE 18 — DEMO-HYD-028 — Rakesh Varma
+------------------------------------------------------------------------
+Expected route: medical-review
+Hospital: Basavatarakam Cancer Hospital (Hyderabad)
+Procedure: Inpatient pneumonia management
+Note: Policy is within the initial 30-day period; emergency admission requires clinical validation.
+
+Copy/paste this complete PowerShell block to run this one sample:
+
+$body = @'
+{
+  "request_id": "MANUAL-DEMO-HYD-028",
+  "patient": {
+    "patient_id": "PAT-HYD-001028",
+    "full_name": "Rakesh Varma",
+    "date_of_birth": "1992-06-04",
+    "gender": "female",
+    "age_at_admission": 34
+  },
+  "policy": {
+    "policy_number": "SH-HYD-100028",
+    "policy_holder_name": "Rakesh Varma",
+    "policy_inception_date": "2026-10-06",
+    "policy_expiry_date": "2027-11-10",
+    "sum_insured_inr": 500000,
+    "cumulative_bonus_inr": 50000,
+    "prior_claims_inr": 0
+  },
+  "hospital": {
+    "hospital_id": "HOSP-HYD-009",
+    "hospital_name": "Basavatarakam Cancer Hospital",
+    "rohini_id": null,
+    "is_network_hospital": false,
+    "city": "Hyderabad",
+    "state": "Telangana"
+  },
+  "medical": {
+    "primary_diagnosis": "Community-acquired pneumonia",
+    "icd10_code": "J18.9",
+    "procedure_name": "Inpatient pneumonia management",
+    "admission_date": "2026-11-01",
+    "expected_discharge_date": "2026-11-05",
+    "admission_type": "emergency",
+    "estimated_cost_inr": 88000,
+    "pre_existing_conditions": [
+      "Asthma"
+    ],
+    "treating_physician": "Dr. Ritu Sharma, MD Pulmonary Medicine"
+  },
+  "free_text_notes": "Policy is within the initial 30-day period; emergency admission requires clinical validation."
+}
+'@
+$response = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/v1/preauth" `
+  -ContentType "application/json" `
+  -Body $body
+$response | ConvertTo-Json -Depth 10
+
+# Save the returned run ID, then poll until the agent finishes.
+$runId = $response.run_id
+do {
+  Start-Sleep -Seconds 2
+  $status = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/preauth/$runId"
+  Write-Host "Status: $($status.status)"
+} while ($status.status -in @("pending", "processing"))
+$status | ConvertTo-Json -Depth 10
+
+
+
+SAMPLE 19 — DEMO-HYD-029 — Sneha Nair
+------------------------------------------------------------------------
+Expected route: query-to-hospital
+Hospital: Basavatarakam Cancer Hospital (Hyderabad)
+Procedure: Hip fracture fixation
+Note: Non-network admission — request emergency certificate, implant details, discharge summary, and original bills.
+
+Copy/paste this complete PowerShell block to run this one sample:
+
+$body = @'
+{
+  "request_id": "MANUAL-DEMO-HYD-029",
+  "patient": {
+    "patient_id": "PAT-HYD-001029",
+    "full_name": "Sneha Nair",
+    "date_of_birth": "1952-07-07",
+    "gender": "female",
+    "age_at_admission": 74
+  },
+  "policy": {
+    "policy_number": "SH-HYD-100029",
+    "policy_holder_name": "Sneha Nair",
+    "policy_inception_date": "2025-10-30",
+    "policy_expiry_date": "2027-11-17",
+    "sum_insured_inr": 500000,
+    "cumulative_bonus_inr": 0,
+    "prior_claims_inr": 0
+  },
+  "hospital": {
+    "hospital_id": "HOSP-HYD-009",
+    "hospital_name": "Basavatarakam Cancer Hospital",
+    "rohini_id": null,
+    "is_network_hospital": false,
+    "city": "Hyderabad",
+    "state": "Telangana"
+  },
+  "medical": {
+    "primary_diagnosis": "Fracture of neck of femur",
+    "icd10_code": "S72.0",
+    "procedure_name": "Hip fracture fixation",
+    "admission_date": "2026-11-02",
+    "expected_discharge_date": "2026-11-09",
+    "admission_type": "emergency",
+    "estimated_cost_inr": 315000,
+    "pre_existing_conditions": [
+      "Osteoporosis"
+    ],
+    "treating_physician": "Dr. Ajay Kulkarni, MS Orthopaedics"
+  },
+  "free_text_notes": "Non-network admission — request emergency certificate, implant details, discharge summary, and original bills."
+}
+'@
+$response = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/v1/preauth" `
+  -ContentType "application/json" `
+  -Body $body
+$response | ConvertTo-Json -Depth 10
+
+# Save the returned run ID, then poll until the agent finishes.
+$runId = $response.run_id
+do {
+  Start-Sleep -Seconds 2
+  $status = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/preauth/$runId"
+  Write-Host "Status: $($status.status)"
+} while ($status.status -in @("pending", "processing"))
+$status | ConvertTo-Json -Depth 10
+
+
+
+SAMPLE 20 — DEMO-HYD-030 — Tarun Kumar
+------------------------------------------------------------------------
+Expected route: medical-review
+Hospital: Yashoda Hospitals Somajiguda (Hyderabad)
+Procedure: Pars plana vitrectomy
+Note: Ophthalmic surgery requires retinal imaging, operative plan, and confirmation of covered indication.
+
+Copy/paste this complete PowerShell block to run this one sample:
+
+$body = @'
+{
+  "request_id": "MANUAL-DEMO-HYD-030",
+  "patient": {
+    "patient_id": "PAT-HYD-001030",
+    "full_name": "Tarun Kumar",
+    "date_of_birth": "1968-08-10",
+    "gender": "male",
+    "age_at_admission": 58
+  },
+  "policy": {
+    "policy_number": "SH-HYD-100030",
+    "policy_holder_name": "Tarun Kumar",
+    "policy_inception_date": "2024-12-09",
+    "policy_expiry_date": "2027-11-24",
+    "sum_insured_inr": 300000,
+    "cumulative_bonus_inr": 0,
+    "prior_claims_inr": 45000
+  },
+  "hospital": {
+    "hospital_id": "HOSP-HYD-002",
+    "hospital_name": "Yashoda Hospitals Somajiguda",
+    "rohini_id": "ROH-HYD-10002",
+    "is_network_hospital": true,
+    "city": "Hyderabad",
+    "state": "Telangana"
+  },
+  "medical": {
+    "primary_diagnosis": "Retinal detachment",
+    "icd10_code": "H33.2",
+    "procedure_name": "Pars plana vitrectomy",
+    "admission_date": "2026-11-03",
+    "expected_discharge_date": "2026-11-05",
+    "admission_type": "planned_surgical",
+    "estimated_cost_inr": 200000,
+    "pre_existing_conditions": [
+      "Type 2 Diabetes"
+    ],
+    "treating_physician": "Dr. Kavya Nair, DNB Ophthalmology"
+  },
+  "free_text_notes": "Ophthalmic surgery requires retinal imaging, operative plan, and confirmation of covered indication."
+}
+'@
+$response = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/v1/preauth" `
+  -ContentType "application/json" `
+  -Body $body
+$response | ConvertTo-Json -Depth 10
+
+# Save the returned run ID, then poll until the agent finishes.
+$runId = $response.run_id
+do {
+  Start-Sleep -Seconds 2
+  $status = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/preauth/$runId"
+  Write-Host "Status: $($status.status)"
+} while ($status.status -in @("pending", "processing"))
+$status | ConvertTo-Json -Depth 10
+
+
+
+SAMPLE 21 — DEMO-HYD-031 — Uma Mahesh
+------------------------------------------------------------------------
+Expected route: approve-recommended
+Hospital: KIMS Hospital Secunderabad (Hyderabad)
+Procedure: Laparoscopic appendicectomy
+Note: Emergency admission — initial waiting period waived; no specific procedure wait applies.
+
+Copy/paste this complete PowerShell block to run this one sample:
+
+$body = @'
+{
+  "request_id": "MANUAL-DEMO-HYD-031",
+  "patient": {
+    "patient_id": "PAT-HYD-001031",
+    "full_name": "Uma Mahesh",
+    "date_of_birth": "1997-09-13",
+    "gender": "male",
+    "age_at_admission": 29
+  },
+  "policy": {
+    "policy_number": "SH-HYD-100031",
+    "policy_holder_name": "Uma Mahesh",
+    "policy_inception_date": "2025-09-05",
+    "policy_expiry_date": "2027-12-01",
+    "sum_insured_inr": 500000,
+    "cumulative_bonus_inr": 0,
+    "prior_claims_inr": 0
+  },
+  "hospital": {
+    "hospital_id": "HOSP-HYD-003",
+    "hospital_name": "KIMS Hospital Secunderabad",
+    "rohini_id": "ROH-HYD-10003",
+    "is_network_hospital": true,
+    "city": "Hyderabad",
+    "state": "Telangana"
+  },
+  "medical": {
+    "primary_diagnosis": "Acute appendicitis",
+    "icd10_code": "K35.8",
+    "procedure_name": "Laparoscopic appendicectomy",
+    "admission_date": "2026-10-30",
+    "expected_discharge_date": "2026-11-02",
+    "admission_type": "emergency",
+    "estimated_cost_inr": 87000,
+    "pre_existing_conditions": [],
+    "treating_physician": "Dr. Anil Menon, MS General Surgery"
+  },
+  "free_text_notes": "Emergency admission — initial waiting period waived; no specific procedure wait applies."
+}
+'@
+$response = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/v1/preauth" `
+  -ContentType "application/json" `
+  -Body $body
+$response | ConvertTo-Json -Depth 10
+
+# Save the returned run ID, then poll until the agent finishes.
+$runId = $response.run_id
+do {
+  Start-Sleep -Seconds 2
+  $status = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/preauth/$runId"
+  Write-Host "Status: $($status.status)"
+} while ($status.status -in @("pending", "processing"))
+$status | ConvertTo-Json -Depth 10
+
+
+
+SAMPLE 22 — DEMO-HYD-032 — Varun Chandra
+------------------------------------------------------------------------
+Expected route: approve-recommended
+Hospital: Care Hospitals Banjara Hills (Hyderabad)
+Procedure: Laparoscopic cholecystectomy
+Note: Policy tenure exceeds the applicable waiting period; network cashless pathway available.
+
+Copy/paste this complete PowerShell block to run this one sample:
+
+$body = @'
+{
+  "request_id": "MANUAL-DEMO-HYD-032",
+  "patient": {
+    "patient_id": "PAT-HYD-001032",
+    "full_name": "Varun Chandra",
+    "date_of_birth": "1983-10-16",
+    "gender": "female",
+    "age_at_admission": 43
+  },
+  "policy": {
+    "policy_number": "SH-HYD-100032",
+    "policy_holder_name": "Varun Chandra",
+    "policy_inception_date": "2024-09-30",
+    "policy_expiry_date": "2027-12-08",
+    "sum_insured_inr": 500000,
+    "cumulative_bonus_inr": 50000,
+    "prior_claims_inr": 0
+  },
+  "hospital": {
+    "hospital_id": "HOSP-HYD-004",
+    "hospital_name": "Care Hospitals Banjara Hills",
+    "rohini_id": "ROH-HYD-10004",
+    "is_network_hospital": true,
+    "city": "Hyderabad",
+    "state": "Telangana"
+  },
+  "medical": {
+    "primary_diagnosis": "Symptomatic gallstones",
+    "icd10_code": "K80.2",
+    "procedure_name": "Laparoscopic cholecystectomy",
+    "admission_date": "2026-10-31",
+    "expected_discharge_date": "2026-11-02",
+    "admission_type": "planned_surgical",
+    "estimated_cost_inr": 110000,
+    "pre_existing_conditions": [
+      "Dyslipidemia"
+    ],
+    "treating_physician": "Dr. Meera Iyer, MS General Surgery"
+  },
+  "free_text_notes": "Policy tenure exceeds the applicable waiting period; network cashless pathway available."
+}
+'@
+$response = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/v1/preauth" `
+  -ContentType "application/json" `
+  -Body $body
+$response | ConvertTo-Json -Depth 10
+
+# Save the returned run ID, then poll until the agent finishes.
+$runId = $response.run_id
+do {
+  Start-Sleep -Seconds 2
+  $status = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/preauth/$runId"
+  Write-Host "Status: $($status.status)"
+} while ($status.status -in @("pending", "processing"))
+$status | ConvertTo-Json -Depth 10
+
+
+
+SAMPLE 23 — DEMO-HYD-033 — Wasim Ahmed
+------------------------------------------------------------------------
+Expected route: medical-review
+Hospital: Star Hospitals Nanakramguda (Hyderabad)
+Procedure: Lumbar microdiscectomy
+Note: Spinal procedure requires review of imaging, conservative treatment history, and medical necessity.
+
+Copy/paste this complete PowerShell block to run this one sample:
+
+$body = @'
+{
+  "request_id": "MANUAL-DEMO-HYD-033",
+  "patient": {
+    "patient_id": "PAT-HYD-001033",
+    "full_name": "Wasim Ahmed",
+    "date_of_birth": "1977-11-19",
+    "gender": "male",
+    "age_at_admission": 49
+  },
+  "policy": {
+    "policy_number": "SH-HYD-100033",
+    "policy_holder_name": "Wasim Ahmed",
+    "policy_inception_date": "2025-02-27",
+    "policy_expiry_date": "2027-12-15",
+    "sum_insured_inr": 300000,
+    "cumulative_bonus_inr": 0,
+    "prior_claims_inr": 0
+  },
+  "hospital": {
+    "hospital_id": "HOSP-HYD-005",
+    "hospital_name": "Star Hospitals Nanakramguda",
+    "rohini_id": "ROH-HYD-10005",
+    "is_network_hospital": true,
+    "city": "Hyderabad",
+    "state": "Telangana"
+  },
+  "medical": {
+    "primary_diagnosis": "Lumbar disc prolapse",
+    "icd10_code": "M51.2",
+    "procedure_name": "Lumbar microdiscectomy",
+    "admission_date": "2026-11-01",
+    "expected_discharge_date": "2026-11-05",
+    "admission_type": "planned_surgical",
+    "estimated_cost_inr": 270000,
+    "pre_existing_conditions": [
+      "Chronic low back pain"
+    ],
+    "treating_physician": "Dr. Nikhil Bhat, MS Orthopaedics"
+  },
+  "free_text_notes": "Spinal procedure requires review of imaging, conservative treatment history, and medical necessity."
+}
+'@
+$response = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/v1/preauth" `
+  -ContentType "application/json" `
+  -Body $body
+$response | ConvertTo-Json -Depth 10
+
+# Save the returned run ID, then poll until the agent finishes.
+$runId = $response.run_id
+do {
+  Start-Sleep -Seconds 2
+  $status = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/preauth/$runId"
+  Write-Host "Status: $($status.status)"
+} while ($status.status -in @("pending", "processing"))
+$status | ConvertTo-Json -Depth 10
+
+
+
+SAMPLE 24 — DEMO-HYD-034 — Yamini Goud
+------------------------------------------------------------------------
+Expected route: medical-review
+Hospital: Fernandez Hospital Bogulkunta (Hyderabad)
+Procedure: Coronary angioplasty with stent
+Note: Emergency cardiac admission; verify policy activation, disclosure history, and clinical records.
+
+Copy/paste this complete PowerShell block to run this one sample:
+
+$body = @'
+{
+  "request_id": "MANUAL-DEMO-HYD-034",
+  "patient": {
+    "patient_id": "PAT-HYD-001034",
+    "full_name": "Yamini Goud",
+    "date_of_birth": "1965-12-22",
+    "gender": "female",
+    "age_at_admission": 61
+  },
+  "policy": {
+    "policy_number": "SH-HYD-100034",
+    "policy_holder_name": "Yamini Goud",
+    "policy_inception_date": "2026-08-01",
+    "policy_expiry_date": "2027-12-22",
+    "sum_insured_inr": 500000,
+    "cumulative_bonus_inr": 0,
+    "prior_claims_inr": 0
+  },
+  "hospital": {
+    "hospital_id": "HOSP-HYD-006",
+    "hospital_name": "Fernandez Hospital Bogulkunta",
+    "rohini_id": "ROH-HYD-10006",
+    "is_network_hospital": true,
+    "city": "Hyderabad",
+    "state": "Telangana"
+  },
+  "medical": {
+    "primary_diagnosis": "Acute myocardial infarction",
+    "icd10_code": "I21.9",
+    "procedure_name": "Coronary angioplasty with stent",
+    "admission_date": "2026-11-02",
+    "expected_discharge_date": "2026-11-07",
+    "admission_type": "emergency",
+    "estimated_cost_inr": 395000,
+    "pre_existing_conditions": [
+      "Hypertension",
+      "Type 2 Diabetes"
+    ],
+    "treating_physician": "Dr. Farah Khan, DM Cardiology"
+  },
+  "free_text_notes": "Emergency cardiac admission; verify policy activation, disclosure history, and clinical records."
+}
+'@
+$response = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/v1/preauth" `
+  -ContentType "application/json" `
+  -Body $body
+$response | ConvertTo-Json -Depth 10
+
+# Save the returned run ID, then poll until the agent finishes.
+$runId = $response.run_id
+do {
+  Start-Sleep -Seconds 2
+  $status = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/preauth/$runId"
+  Write-Host "Status: $($status.status)"
+} while ($status.status -in @("pending", "processing"))
+$status | ConvertTo-Json -Depth 10
+
+
+
+SAMPLE 25 — DEMO-HYD-035 — Zoya Khan
+------------------------------------------------------------------------
+Expected route: approve-recommended
+Hospital: Gleneagles Global Hospitals LB Nagar (Hyderabad)
+Procedure: Ureteroscopy with laser lithotripsy
+Note: Day-care urology procedure; policy tenure and hospital network status are satisfactory.
+
+Copy/paste this complete PowerShell block to run this one sample:
+
+$body = @'
+{
+  "request_id": "MANUAL-DEMO-HYD-035",
+  "patient": {
+    "patient_id": "PAT-HYD-001035",
+    "full_name": "Zoya Khan",
+    "date_of_birth": "1989-01-25",
+    "gender": "male",
+    "age_at_admission": 37
+  },
+  "policy": {
+    "policy_number": "SH-HYD-100035",
+    "policy_holder_name": "Zoya Khan",
+    "policy_inception_date": "2025-07-07",
+    "policy_expiry_date": "2027-12-29",
+    "sum_insured_inr": 500000,
+    "cumulative_bonus_inr": 0,
+    "prior_claims_inr": 45000
+  },
+  "hospital": {
+    "hospital_id": "HOSP-HYD-007",
+    "hospital_name": "Gleneagles Global Hospitals LB Nagar",
+    "rohini_id": "ROH-HYD-10007",
+    "is_network_hospital": true,
+    "city": "Hyderabad",
+    "state": "Telangana"
+  },
+  "medical": {
+    "primary_diagnosis": "Ureteric calculus",
+    "icd10_code": "N20.0",
+    "procedure_name": "Ureteroscopy with laser lithotripsy",
+    "admission_date": "2026-11-03",
+    "expected_discharge_date": "2026-11-04",
+    "admission_type": "day_care",
+    "estimated_cost_inr": 150000,
+    "pre_existing_conditions": [],
+    "treating_physician": "Dr. Vivek Rangan, MCh Urology"
+  },
+  "free_text_notes": "Day-care urology procedure; policy tenure and hospital network status are satisfactory."
+}
+'@
+$response = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/v1/preauth" `
+  -ContentType "application/json" `
+  -Body $body
+$response | ConvertTo-Json -Depth 10
+
+# Save the returned run ID, then poll until the agent finishes.
+$runId = $response.run_id
+do {
+  Start-Sleep -Seconds 2
+  $status = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/preauth/$runId"
+  Write-Host "Status: $($status.status)"
+} while ($status.status -in @("pending", "processing"))
+$status | ConvertTo-Json -Depth 10
+
+
+
+SAMPLE 26 — DEMO-BLR-011 — Aditi Menon
+------------------------------------------------------------------------
+Expected route: approve-recommended
+Hospital: Manipal Hospital Old Airport Road (Bangalore)
+Procedure: Laparoscopic appendicectomy
+Note: Emergency admission — initial waiting period waived; no specific procedure wait applies.
+
+Copy/paste this complete PowerShell block to run this one sample:
+
+$body = @'
+{
+  "request_id": "MANUAL-DEMO-BLR-011",
+  "patient": {
+    "patient_id": "PAT-BLR-001011",
+    "full_name": "Aditi Menon",
+    "date_of_birth": "1997-01-07",
+    "gender": "male",
+    "age_at_admission": 29
+  },
+  "policy": {
+    "policy_number": "SH-BLR-100011",
+    "policy_holder_name": "Aditi Menon",
+    "policy_inception_date": "2025-09-05",
+    "policy_expiry_date": "2027-07-14",
+    "sum_insured_inr": 500000,
+    "cumulative_bonus_inr": 0,
+    "prior_claims_inr": 0
+  },
+  "hospital": {
+    "hospital_id": "HOSP-BLR-001",
+    "hospital_name": "Manipal Hospital Old Airport Road",
+    "rohini_id": "ROH-BLR-20001",
+    "is_network_hospital": true,
+    "city": "Bangalore",
+    "state": "Karnataka"
+  },
+  "medical": {
+    "primary_diagnosis": "Acute appendicitis",
+    "icd10_code": "K35.8",
+    "procedure_name": "Laparoscopic appendicectomy",
+    "admission_date": "2026-10-30",
+    "expected_discharge_date": "2026-11-02",
+    "admission_type": "emergency",
+    "estimated_cost_inr": 87000,
+    "pre_existing_conditions": [],
+    "treating_physician": "Dr. Anil Menon, MS General Surgery"
+  },
+  "free_text_notes": "Emergency admission — initial waiting period waived; no specific procedure wait applies."
+}
+'@
+$response = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/v1/preauth" `
+  -ContentType "application/json" `
+  -Body $body
+$response | ConvertTo-Json -Depth 10
+
+# Save the returned run ID, then poll until the agent finishes.
+$runId = $response.run_id
+do {
+  Start-Sleep -Seconds 2
+  $status = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/preauth/$runId"
+  Write-Host "Status: $($status.status)"
+} while ($status.status -in @("pending", "processing"))
+$status | ConvertTo-Json -Depth 10
+
+
+
+SAMPLE 27 — DEMO-BLR-012 — Bharat Shetty
+------------------------------------------------------------------------
+Expected route: approve-recommended
+Hospital: Narayana Health City Bommasandra (Bangalore)
+Procedure: Laparoscopic cholecystectomy
+Note: Policy tenure exceeds the applicable waiting period; network cashless pathway available.
+
+Copy/paste this complete PowerShell block to run this one sample:
+
+$body = @'
+{
+  "request_id": "MANUAL-DEMO-BLR-012",
+  "patient": {
+    "patient_id": "PAT-BLR-001012",
+    "full_name": "Bharat Shetty",
+    "date_of_birth": "1983-02-10",
+    "gender": "female",
+    "age_at_admission": 43
+  },
+  "policy": {
+    "policy_number": "SH-BLR-100012",
+    "policy_holder_name": "Bharat Shetty",
+    "policy_inception_date": "2024-09-30",
+    "policy_expiry_date": "2027-07-21",
+    "sum_insured_inr": 300000,
+    "cumulative_bonus_inr": 50000,
+    "prior_claims_inr": 0
+  },
+  "hospital": {
+    "hospital_id": "HOSP-BLR-002",
+    "hospital_name": "Narayana Health City Bommasandra",
+    "rohini_id": "ROH-BLR-20002",
+    "is_network_hospital": true,
+    "city": "Bangalore",
+    "state": "Karnataka"
+  },
+  "medical": {
+    "primary_diagnosis": "Symptomatic gallstones",
+    "icd10_code": "K80.2",
+    "procedure_name": "Laparoscopic cholecystectomy",
+    "admission_date": "2026-10-31",
+    "expected_discharge_date": "2026-11-02",
+    "admission_type": "planned_surgical",
+    "estimated_cost_inr": 110000,
+    "pre_existing_conditions": [
+      "Dyslipidemia"
+    ],
+    "treating_physician": "Dr. Meera Iyer, MS General Surgery"
+  },
+  "free_text_notes": "Policy tenure exceeds the applicable waiting period; network cashless pathway available."
+}
+'@
+$response = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/v1/preauth" `
+  -ContentType "application/json" `
+  -Body $body
+$response | ConvertTo-Json -Depth 10
+
+# Save the returned run ID, then poll until the agent finishes.
+$runId = $response.run_id
+do {
+  Start-Sleep -Seconds 2
+  $status = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/preauth/$runId"
+  Write-Host "Status: $($status.status)"
+} while ($status.status -in @("pending", "processing"))
+$status | ConvertTo-Json -Depth 10
+
+
+
+SAMPLE 28 — DEMO-BLR-013 — Chaitanya Rao
+------------------------------------------------------------------------
+Expected route: medical-review
+Hospital: Fortis Hospital Bannerghatta Road (Bangalore)
+Procedure: Lumbar microdiscectomy
+Note: Spinal procedure requires review of imaging, conservative treatment history, and medical necessity.
+
+Copy/paste this complete PowerShell block to run this one sample:
+
+$body = @'
+{
+  "request_id": "MANUAL-DEMO-BLR-013",
+  "patient": {
+    "patient_id": "PAT-BLR-001013",
+    "full_name": "Chaitanya Rao",
+    "date_of_birth": "1977-03-13",
+    "gender": "male",
+    "age_at_admission": 49
+  },
+  "policy": {
+    "policy_number": "SH-BLR-100013",
+    "policy_holder_name": "Chaitanya Rao",
+    "policy_inception_date": "2025-02-27",
+    "policy_expiry_date": "2027-07-28",
+    "sum_insured_inr": 500000,
+    "cumulative_bonus_inr": 0,
+    "prior_claims_inr": 0
+  },
+  "hospital": {
+    "hospital_id": "HOSP-BLR-003",
+    "hospital_name": "Fortis Hospital Bannerghatta Road",
+    "rohini_id": "ROH-BLR-20003",
+    "is_network_hospital": true,
+    "city": "Bangalore",
+    "state": "Karnataka"
+  },
+  "medical": {
+    "primary_diagnosis": "Lumbar disc prolapse",
+    "icd10_code": "M51.2",
+    "procedure_name": "Lumbar microdiscectomy",
+    "admission_date": "2026-11-01",
+    "expected_discharge_date": "2026-11-05",
+    "admission_type": "planned_surgical",
+    "estimated_cost_inr": 270000,
+    "pre_existing_conditions": [
+      "Chronic low back pain"
+    ],
+    "treating_physician": "Dr. Nikhil Bhat, MS Orthopaedics"
+  },
+  "free_text_notes": "Spinal procedure requires review of imaging, conservative treatment history, and medical necessity."
+}
+'@
+$response = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/v1/preauth" `
+  -ContentType "application/json" `
+  -Body $body
+$response | ConvertTo-Json -Depth 10
+
+# Save the returned run ID, then poll until the agent finishes.
+$runId = $response.run_id
+do {
+  Start-Sleep -Seconds 2
+  $status = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/preauth/$runId"
+  Write-Host "Status: $($status.status)"
+} while ($status.status -in @("pending", "processing"))
+$status | ConvertTo-Json -Depth 10
+
+
+
+SAMPLE 29 — DEMO-BLR-014 — Divya Hegde
+------------------------------------------------------------------------
+Expected route: medical-review
+Hospital: Columbia Asia Hospital Hebbal (Bangalore)
+Procedure: Coronary angioplasty with stent
+Note: Emergency cardiac admission; verify policy activation, disclosure history, and clinical records.
+
+Copy/paste this complete PowerShell block to run this one sample:
+
+$body = @'
+{
+  "request_id": "MANUAL-DEMO-BLR-014",
+  "patient": {
+    "patient_id": "PAT-BLR-001014",
+    "full_name": "Divya Hegde",
+    "date_of_birth": "1965-04-16",
+    "gender": "female",
+    "age_at_admission": 61
+  },
+  "policy": {
+    "policy_number": "SH-BLR-100014",
+    "policy_holder_name": "Divya Hegde",
+    "policy_inception_date": "2026-08-01",
+    "policy_expiry_date": "2027-08-04",
+    "sum_insured_inr": 500000,
+    "cumulative_bonus_inr": 0,
+    "prior_claims_inr": 0
+  },
+  "hospital": {
+    "hospital_id": "HOSP-BLR-004",
+    "hospital_name": "Columbia Asia Hospital Hebbal",
+    "rohini_id": "ROH-BLR-20004",
+    "is_network_hospital": true,
+    "city": "Bangalore",
+    "state": "Karnataka"
+  },
+  "medical": {
+    "primary_diagnosis": "Acute myocardial infarction",
+    "icd10_code": "I21.9",
+    "procedure_name": "Coronary angioplasty with stent",
+    "admission_date": "2026-11-02",
+    "expected_discharge_date": "2026-11-07",
+    "admission_type": "emergency",
+    "estimated_cost_inr": 395000,
+    "pre_existing_conditions": [
+      "Hypertension",
+      "Type 2 Diabetes"
+    ],
+    "treating_physician": "Dr. Farah Khan, DM Cardiology"
+  },
+  "free_text_notes": "Emergency cardiac admission; verify policy activation, disclosure history, and clinical records."
+}
+'@
+$response = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/v1/preauth" `
+  -ContentType "application/json" `
+  -Body $body
+$response | ConvertTo-Json -Depth 10
+
+# Save the returned run ID, then poll until the agent finishes.
+$runId = $response.run_id
+do {
+  Start-Sleep -Seconds 2
+  $status = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/preauth/$runId"
+  Write-Host "Status: $($status.status)"
+} while ($status.status -in @("pending", "processing"))
+$status | ConvertTo-Json -Depth 10
+
+
+
+SAMPLE 30 — DEMO-BLR-015 — Elvin D'Souza
+------------------------------------------------------------------------
+Expected route: approve-recommended
+Hospital: Aster CMI Hospital Hebbal (Bangalore)
+Procedure: Ureteroscopy with laser lithotripsy
+Note: Day-care urology procedure; policy tenure and hospital network status are satisfactory.
+
+Copy/paste this complete PowerShell block to run this one sample:
+
+$body = @'
+{
+  "request_id": "MANUAL-DEMO-BLR-015",
+  "patient": {
+    "patient_id": "PAT-BLR-001015",
+    "full_name": "Elvin D'Souza",
+    "date_of_birth": "1989-05-19",
+    "gender": "male",
+    "age_at_admission": 37
+  },
+  "policy": {
+    "policy_number": "SH-BLR-100015",
+    "policy_holder_name": "Elvin D'Souza",
+    "policy_inception_date": "2025-07-07",
+    "policy_expiry_date": "2027-08-11",
+    "sum_insured_inr": 300000,
+    "cumulative_bonus_inr": 0,
+    "prior_claims_inr": 45000
+  },
+  "hospital": {
+    "hospital_id": "HOSP-BLR-005",
+    "hospital_name": "Aster CMI Hospital Hebbal",
+    "rohini_id": "ROH-BLR-20005",
+    "is_network_hospital": true,
+    "city": "Bangalore",
+    "state": "Karnataka"
+  },
+  "medical": {
+    "primary_diagnosis": "Ureteric calculus",
+    "icd10_code": "N20.0",
+    "procedure_name": "Ureteroscopy with laser lithotripsy",
+    "admission_date": "2026-11-03",
+    "expected_discharge_date": "2026-11-04",
+    "admission_type": "day_care",
+    "estimated_cost_inr": 150000,
+    "pre_existing_conditions": [],
+    "treating_physician": "Dr. Vivek Rangan, MCh Urology"
+  },
+  "free_text_notes": "Day-care urology procedure; policy tenure and hospital network status are satisfactory."
+}
+'@
+$response = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/v1/preauth" `
+  -ContentType "application/json" `
+  -Body $body
+$response | ConvertTo-Json -Depth 10
+
+# Save the returned run ID, then poll until the agent finishes.
+$runId = $response.run_id
+do {
+  Start-Sleep -Seconds 2
+  $status = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/preauth/$runId"
+  Write-Host "Status: $($status.status)"
+} while ($status.status -in @("pending", "processing"))
+$status | ConvertTo-Json -Depth 10
+
+
+
+SAMPLE 31 — DEMO-BLR-016 — Gautham Iyer
+------------------------------------------------------------------------
+Expected route: medical-review
+Hospital: BGS Gleneagles Global Hospital Kengeri (Bangalore)
+Procedure: Transurethral resection of prostate
+Note: Review age-specific disease waiting period and prior conservative management before approval.
+
+Copy/paste this complete PowerShell block to run this one sample:
+
+$body = @'
+{
+  "request_id": "MANUAL-DEMO-BLR-016",
+  "patient": {
+    "patient_id": "PAT-BLR-001016",
+    "full_name": "Gautham Iyer",
+    "date_of_birth": "1959-06-22",
+    "gender": "male",
+    "age_at_admission": 67
+  },
+  "policy": {
+    "policy_number": "SH-BLR-100016",
+    "policy_holder_name": "Gautham Iyer",
+    "policy_inception_date": "2025-05-18",
+    "policy_expiry_date": "2027-08-18",
+    "sum_insured_inr": 500000,
+    "cumulative_bonus_inr": 50000,
+    "prior_claims_inr": 0
+  },
+  "hospital": {
+    "hospital_id": "HOSP-BLR-006",
+    "hospital_name": "BGS Gleneagles Global Hospital Kengeri",
+    "rohini_id": "ROH-BLR-20006",
+    "is_network_hospital": true,
+    "city": "Bangalore",
+    "state": "Karnataka"
+  },
+  "medical": {
+    "primary_diagnosis": "Benign prostatic hyperplasia",
+    "icd10_code": "N40.1",
+    "procedure_name": "Transurethral resection of prostate",
+    "admission_date": "2026-10-30",
+    "expected_discharge_date": "2026-11-02",
+    "admission_type": "planned_surgical",
+    "estimated_cost_inr": 175000,
+    "pre_existing_conditions": [
+      "Hypertension"
+    ],
+    "treating_physician": "Dr. Suresh Rao, MCh Urology"
+  },
+  "free_text_notes": "Review age-specific disease waiting period and prior conservative management before approval."
+}
+'@
+$response = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/v1/preauth" `
+  -ContentType "application/json" `
+  -Body $body
+$response | ConvertTo-Json -Depth 10
+
+# Save the returned run ID, then poll until the agent finishes.
+$runId = $response.run_id
+do {
+  Start-Sleep -Seconds 2
+  $status = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/preauth/$runId"
+  Write-Host "Status: $($status.status)"
+} while ($status.status -in @("pending", "processing"))
+$status | ConvertTo-Json -Depth 10
+
+
+
+SAMPLE 32 — DEMO-BLR-017 — Hema Srinivas
+------------------------------------------------------------------------
+Expected route: approve-recommended
+Hospital: Sakra World Hospital Devarabisanahalli (Bangalore)
+Procedure: Laparoscopic hysterectomy
+Note: Waiting period is satisfied; obtain routine pre-operative reports and admission estimate.
+
+Copy/paste this complete PowerShell block to run this one sample:
+
+$body = @'
+{
+  "request_id": "MANUAL-DEMO-BLR-017",
+  "patient": {
+    "patient_id": "PAT-BLR-001017",
+    "full_name": "Hema Srinivas",
+    "date_of_birth": "1980-07-25",
+    "gender": "female",
+    "age_at_admission": 46
+  },
+  "policy": {
+    "policy_number": "SH-BLR-100017",
+    "policy_holder_name": "Hema Srinivas",
+    "policy_inception_date": "2024-08-11",
+    "policy_expiry_date": "2027-08-25",
+    "sum_insured_inr": 500000,
+    "cumulative_bonus_inr": 0,
+    "prior_claims_inr": 0
+  },
+  "hospital": {
+    "hospital_id": "HOSP-BLR-007",
+    "hospital_name": "Sakra World Hospital Devarabisanahalli",
+    "rohini_id": "ROH-BLR-20007",
+    "is_network_hospital": true,
+    "city": "Bangalore",
+    "state": "Karnataka"
+  },
+  "medical": {
+    "primary_diagnosis": "Uterine leiomyoma",
+    "icd10_code": "D25.9",
+    "procedure_name": "Laparoscopic hysterectomy",
+    "admission_date": "2026-10-31",
+    "expected_discharge_date": "2026-11-03",
+    "admission_type": "planned_surgical",
+    "estimated_cost_inr": 225000,
+    "pre_existing_conditions": [
+      "Iron deficiency anaemia"
+    ],
+    "treating_physician": "Dr. Shalini Joseph, MD Obstetrics and Gynaecology"
+  },
+  "free_text_notes": "Waiting period is satisfied; obtain routine pre-operative reports and admission estimate."
+}
+'@
+$response = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/v1/preauth" `
+  -ContentType "application/json" `
+  -Body $body
+$response | ConvertTo-Json -Depth 10
+
+# Save the returned run ID, then poll until the agent finishes.
+$runId = $response.run_id
+do {
+  Start-Sleep -Seconds 2
+  $status = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/preauth/$runId"
+  Write-Host "Status: $($status.status)"
+} while ($status.status -in @("pending", "processing"))
+$status | ConvertTo-Json -Depth 10
+
+
+
+SAMPLE 33 — DEMO-BLR-018 — Imran Khan
+------------------------------------------------------------------------
+Expected route: medical-review
+Hospital: Sparsh Hospital Infantry Road (Bangalore)
+Procedure: Inpatient pneumonia management
+Note: Policy is within the initial 30-day period; emergency admission requires clinical validation.
+
+Copy/paste this complete PowerShell block to run this one sample:
+
+$body = @'
+{
+  "request_id": "MANUAL-DEMO-BLR-018",
+  "patient": {
+    "patient_id": "PAT-BLR-001018",
+    "full_name": "Imran Khan",
+    "date_of_birth": "1992-08-01",
+    "gender": "female",
+    "age_at_admission": 34
+  },
+  "policy": {
+    "policy_number": "SH-BLR-100018",
+    "policy_holder_name": "Imran Khan",
+    "policy_inception_date": "2026-10-06",
+    "policy_expiry_date": "2027-09-01",
+    "sum_insured_inr": 300000,
+    "cumulative_bonus_inr": 0,
+    "prior_claims_inr": 0
+  },
+  "hospital": {
+    "hospital_id": "HOSP-BLR-008",
+    "hospital_name": "Sparsh Hospital Infantry Road",
+    "rohini_id": "ROH-BLR-20008",
+    "is_network_hospital": true,
+    "city": "Bangalore",
+    "state": "Karnataka"
+  },
+  "medical": {
+    "primary_diagnosis": "Community-acquired pneumonia",
+    "icd10_code": "J18.9",
+    "procedure_name": "Inpatient pneumonia management",
+    "admission_date": "2026-11-01",
+    "expected_discharge_date": "2026-11-05",
+    "admission_type": "emergency",
+    "estimated_cost_inr": 98000,
+    "pre_existing_conditions": [
+      "Asthma"
+    ],
+    "treating_physician": "Dr. Ritu Sharma, MD Pulmonary Medicine"
+  },
+  "free_text_notes": "Policy is within the initial 30-day period; emergency admission requires clinical validation."
+}
+'@
+$response = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/v1/preauth" `
+  -ContentType "application/json" `
+  -Body $body
+$response | ConvertTo-Json -Depth 10
+
+# Save the returned run ID, then poll until the agent finishes.
+$runId = $response.run_id
+do {
+  Start-Sleep -Seconds 2
+  $status = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/preauth/$runId"
+  Write-Host "Status: $($status.status)"
+} while ($status.status -in @("pending", "processing"))
+$status | ConvertTo-Json -Depth 10
+
+
+
+SAMPLE 34 — DEMO-BLR-019 — Jyothi Nair
+------------------------------------------------------------------------
+Expected route: query-to-hospital
+Hospital: NIMHANS Hosur Road (Bangalore)
+Procedure: Hip fracture fixation
+Note: Non-network admission — request emergency certificate, implant details, discharge summary, and original bills.
+
+Copy/paste this complete PowerShell block to run this one sample:
+
+$body = @'
+{
+  "request_id": "MANUAL-DEMO-BLR-019",
+  "patient": {
+    "patient_id": "PAT-BLR-001019",
+    "full_name": "Jyothi Nair",
+    "date_of_birth": "1952-09-04",
+    "gender": "female",
+    "age_at_admission": 74
+  },
+  "policy": {
+    "policy_number": "SH-BLR-100019",
+    "policy_holder_name": "Jyothi Nair",
+    "policy_inception_date": "2025-10-30",
+    "policy_expiry_date": "2027-09-08",
+    "sum_insured_inr": 500000,
+    "cumulative_bonus_inr": 0,
+    "prior_claims_inr": 0
+  },
+  "hospital": {
+    "hospital_id": "HOSP-BLR-009",
+    "hospital_name": "NIMHANS Hosur Road",
+    "rohini_id": null,
+    "is_network_hospital": false,
+    "city": "Bangalore",
+    "state": "Karnataka"
+  },
+  "medical": {
+    "primary_diagnosis": "Fracture of neck of femur",
+    "icd10_code": "S72.0",
+    "procedure_name": "Hip fracture fixation",
+    "admission_date": "2026-11-02",
+    "expected_discharge_date": "2026-11-09",
+    "admission_type": "emergency",
+    "estimated_cost_inr": 325000,
+    "pre_existing_conditions": [
+      "Osteoporosis"
+    ],
+    "treating_physician": "Dr. Ajay Kulkarni, MS Orthopaedics"
+  },
+  "free_text_notes": "Non-network admission — request emergency certificate, implant details, discharge summary, and original bills."
+}
+'@
+$response = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/v1/preauth" `
+  -ContentType "application/json" `
+  -Body $body
+$response | ConvertTo-Json -Depth 10
+
+# Save the returned run ID, then poll until the agent finishes.
+$runId = $response.run_id
+do {
+  Start-Sleep -Seconds 2
+  $status = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/preauth/$runId"
+  Write-Host "Status: $($status.status)"
+} while ($status.status -in @("pending", "processing"))
+$status | ConvertTo-Json -Depth 10
+
+
+
+SAMPLE 35 — DEMO-BLR-020 — Kiran Bhat
+------------------------------------------------------------------------
+Expected route: medical-review
+Hospital: Manipal Hospital Old Airport Road (Bangalore)
+Procedure: Pars plana vitrectomy
+Note: Ophthalmic surgery requires retinal imaging, operative plan, and confirmation of covered indication.
+
+Copy/paste this complete PowerShell block to run this one sample:
+
+$body = @'
+{
+  "request_id": "MANUAL-DEMO-BLR-020",
+  "patient": {
+    "patient_id": "PAT-BLR-001020",
+    "full_name": "Kiran Bhat",
+    "date_of_birth": "1968-10-07",
+    "gender": "male",
+    "age_at_admission": 58
+  },
+  "policy": {
+    "policy_number": "SH-BLR-100020",
+    "policy_holder_name": "Kiran Bhat",
+    "policy_inception_date": "2024-12-09",
+    "policy_expiry_date": "2027-09-15",
+    "sum_insured_inr": 500000,
+    "cumulative_bonus_inr": 50000,
+    "prior_claims_inr": 45000
+  },
+  "hospital": {
+    "hospital_id": "HOSP-BLR-001",
+    "hospital_name": "Manipal Hospital Old Airport Road",
+    "rohini_id": "ROH-BLR-20001",
+    "is_network_hospital": true,
+    "city": "Bangalore",
+    "state": "Karnataka"
+  },
+  "medical": {
+    "primary_diagnosis": "Retinal detachment",
+    "icd10_code": "H33.2",
+    "procedure_name": "Pars plana vitrectomy",
+    "admission_date": "2026-11-03",
+    "expected_discharge_date": "2026-11-05",
+    "admission_type": "planned_surgical",
+    "estimated_cost_inr": 190000,
+    "pre_existing_conditions": [
+      "Type 2 Diabetes"
+    ],
+    "treating_physician": "Dr. Kavya Nair, DNB Ophthalmology"
+  },
+  "free_text_notes": "Ophthalmic surgery requires retinal imaging, operative plan, and confirmation of covered indication."
+}
+'@
+$response = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/v1/preauth" `
+  -ContentType "application/json" `
+  -Body $body
+$response | ConvertTo-Json -Depth 10
+
+# Save the returned run ID, then poll until the agent finishes.
+$runId = $response.run_id
+do {
+  Start-Sleep -Seconds 2
+  $status = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/preauth/$runId"
+  Write-Host "Status: $($status.status)"
+} while ($status.status -in @("pending", "processing"))
+$status | ConvertTo-Json -Depth 10
+
+
+
+SAMPLE 36 — DEMO-BLR-021 — Lekha Prasad
+------------------------------------------------------------------------
+Expected route: approve-recommended
+Hospital: Narayana Health City Bommasandra (Bangalore)
+Procedure: Laparoscopic appendicectomy
+Note: Emergency admission — initial waiting period waived; no specific procedure wait applies.
+
+Copy/paste this complete PowerShell block to run this one sample:
+
+$body = @'
+{
+  "request_id": "MANUAL-DEMO-BLR-021",
+  "patient": {
+    "patient_id": "PAT-BLR-001021",
+    "full_name": "Lekha Prasad",
+    "date_of_birth": "1997-11-10",
+    "gender": "male",
+    "age_at_admission": 29
+  },
+  "policy": {
+    "policy_number": "SH-BLR-100021",
+    "policy_holder_name": "Lekha Prasad",
+    "policy_inception_date": "2025-09-05",
+    "policy_expiry_date": "2027-09-22",
+    "sum_insured_inr": 300000,
+    "cumulative_bonus_inr": 0,
+    "prior_claims_inr": 0
+  },
+  "hospital": {
+    "hospital_id": "HOSP-BLR-002",
+    "hospital_name": "Narayana Health City Bommasandra",
+    "rohini_id": "ROH-BLR-20002",
+    "is_network_hospital": true,
+    "city": "Bangalore",
+    "state": "Karnataka"
+  },
+  "medical": {
+    "primary_diagnosis": "Acute appendicitis",
+    "icd10_code": "K35.8",
+    "procedure_name": "Laparoscopic appendicectomy",
+    "admission_date": "2026-10-30",
+    "expected_discharge_date": "2026-11-02",
+    "admission_type": "emergency",
+    "estimated_cost_inr": 77000,
+    "pre_existing_conditions": [],
+    "treating_physician": "Dr. Anil Menon, MS General Surgery"
+  },
+  "free_text_notes": "Emergency admission — initial waiting period waived; no specific procedure wait applies."
+}
+'@
+$response = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/v1/preauth" `
+  -ContentType "application/json" `
+  -Body $body
+$response | ConvertTo-Json -Depth 10
+
+# Save the returned run ID, then poll until the agent finishes.
+$runId = $response.run_id
+do {
+  Start-Sleep -Seconds 2
+  $status = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/preauth/$runId"
+  Write-Host "Status: $($status.status)"
+} while ($status.status -in @("pending", "processing"))
+$status | ConvertTo-Json -Depth 10
+
+
+
+SAMPLE 37 — DEMO-BLR-022 — Madhav Gowda
+------------------------------------------------------------------------
+Expected route: approve-recommended
+Hospital: Fortis Hospital Bannerghatta Road (Bangalore)
+Procedure: Laparoscopic cholecystectomy
+Note: Policy tenure exceeds the applicable waiting period; network cashless pathway available.
+
+Copy/paste this complete PowerShell block to run this one sample:
+
+$body = @'
+{
+  "request_id": "MANUAL-DEMO-BLR-022",
+  "patient": {
+    "patient_id": "PAT-BLR-001022",
+    "full_name": "Madhav Gowda",
+    "date_of_birth": "1983-12-13",
+    "gender": "female",
+    "age_at_admission": 43
+  },
+  "policy": {
+    "policy_number": "SH-BLR-100022",
+    "policy_holder_name": "Madhav Gowda",
+    "policy_inception_date": "2024-09-30",
+    "policy_expiry_date": "2027-09-29",
+    "sum_insured_inr": 500000,
+    "cumulative_bonus_inr": 0,
+    "prior_claims_inr": 0
+  },
+  "hospital": {
+    "hospital_id": "HOSP-BLR-003",
+    "hospital_name": "Fortis Hospital Bannerghatta Road",
+    "rohini_id": "ROH-BLR-20003",
+    "is_network_hospital": true,
+    "city": "Bangalore",
+    "state": "Karnataka"
+  },
+  "medical": {
+    "primary_diagnosis": "Symptomatic gallstones",
+    "icd10_code": "K80.2",
+    "procedure_name": "Laparoscopic cholecystectomy",
+    "admission_date": "2026-10-31",
+    "expected_discharge_date": "2026-11-02",
+    "admission_type": "planned_surgical",
+    "estimated_cost_inr": 120000,
+    "pre_existing_conditions": [
+      "Dyslipidemia"
+    ],
+    "treating_physician": "Dr. Meera Iyer, MS General Surgery"
+  },
+  "free_text_notes": "Policy tenure exceeds the applicable waiting period; network cashless pathway available."
+}
+'@
+$response = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/v1/preauth" `
+  -ContentType "application/json" `
+  -Body $body
+$response | ConvertTo-Json -Depth 10
+
+# Save the returned run ID, then poll until the agent finishes.
+$runId = $response.run_id
+do {
+  Start-Sleep -Seconds 2
+  $status = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/preauth/$runId"
+  Write-Host "Status: $($status.status)"
+} while ($status.status -in @("pending", "processing"))
+$status | ConvertTo-Json -Depth 10
+
+
+
+SAMPLE 38 — DEMO-BLR-023 — Nisha Thomas
+------------------------------------------------------------------------
+Expected route: medical-review
+Hospital: Columbia Asia Hospital Hebbal (Bangalore)
+Procedure: Lumbar microdiscectomy
+Note: Spinal procedure requires review of imaging, conservative treatment history, and medical necessity.
+
+Copy/paste this complete PowerShell block to run this one sample:
+
+$body = @'
+{
+  "request_id": "MANUAL-DEMO-BLR-023",
+  "patient": {
+    "patient_id": "PAT-BLR-001023",
+    "full_name": "Nisha Thomas",
+    "date_of_birth": "1977-01-16",
+    "gender": "male",
+    "age_at_admission": 49
+  },
+  "policy": {
+    "policy_number": "SH-BLR-100023",
+    "policy_holder_name": "Nisha Thomas",
+    "policy_inception_date": "2025-02-27",
+    "policy_expiry_date": "2027-10-06",
+    "sum_insured_inr": 500000,
+    "cumulative_bonus_inr": 0,
+    "prior_claims_inr": 0
+  },
+  "hospital": {
+    "hospital_id": "HOSP-BLR-004",
+    "hospital_name": "Columbia Asia Hospital Hebbal",
+    "rohini_id": "ROH-BLR-20004",
+    "is_network_hospital": true,
+    "city": "Bangalore",
+    "state": "Karnataka"
+  },
+  "medical": {
+    "primary_diagnosis": "Lumbar disc prolapse",
+    "icd10_code": "M51.2",
+    "procedure_name": "Lumbar microdiscectomy",
+    "admission_date": "2026-11-01",
+    "expected_discharge_date": "2026-11-05",
+    "admission_type": "planned_surgical",
+    "estimated_cost_inr": 280000,
+    "pre_existing_conditions": [
+      "Chronic low back pain"
+    ],
+    "treating_physician": "Dr. Nikhil Bhat, MS Orthopaedics"
+  },
+  "free_text_notes": "Spinal procedure requires review of imaging, conservative treatment history, and medical necessity."
+}
+'@
+$response = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/v1/preauth" `
+  -ContentType "application/json" `
+  -Body $body
+$response | ConvertTo-Json -Depth 10
+
+# Save the returned run ID, then poll until the agent finishes.
+$runId = $response.run_id
+do {
+  Start-Sleep -Seconds 2
+  $status = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/preauth/$runId"
+  Write-Host "Status: $($status.status)"
+} while ($status.status -in @("pending", "processing"))
+$status | ConvertTo-Json -Depth 10
+
+
+
+SAMPLE 39 — DEMO-BLR-024 — Omar Farooq
+------------------------------------------------------------------------
+Expected route: medical-review
+Hospital: Aster CMI Hospital Hebbal (Bangalore)
+Procedure: Coronary angioplasty with stent
+Note: Emergency cardiac admission; verify policy activation, disclosure history, and clinical records.
+
+Copy/paste this complete PowerShell block to run this one sample:
+
+$body = @'
+{
+  "request_id": "MANUAL-DEMO-BLR-024",
+  "patient": {
+    "patient_id": "PAT-BLR-001024",
+    "full_name": "Omar Farooq",
+    "date_of_birth": "1965-02-19",
+    "gender": "female",
+    "age_at_admission": 61
+  },
+  "policy": {
+    "policy_number": "SH-BLR-100024",
+    "policy_holder_name": "Omar Farooq",
+    "policy_inception_date": "2026-08-01",
+    "policy_expiry_date": "2027-10-13",
+    "sum_insured_inr": 300000,
+    "cumulative_bonus_inr": 50000,
+    "prior_claims_inr": 0
+  },
+  "hospital": {
+    "hospital_id": "HOSP-BLR-005",
+    "hospital_name": "Aster CMI Hospital Hebbal",
+    "rohini_id": "ROH-BLR-20005",
+    "is_network_hospital": true,
+    "city": "Bangalore",
+    "state": "Karnataka"
+  },
+  "medical": {
+    "primary_diagnosis": "Acute myocardial infarction",
+    "icd10_code": "I21.9",
+    "procedure_name": "Coronary angioplasty with stent",
+    "admission_date": "2026-11-02",
+    "expected_discharge_date": "2026-11-07",
+    "admission_type": "emergency",
+    "estimated_cost_inr": 385000,
+    "pre_existing_conditions": [
+      "Hypertension",
+      "Type 2 Diabetes"
+    ],
+    "treating_physician": "Dr. Farah Khan, DM Cardiology"
+  },
+  "free_text_notes": "Emergency cardiac admission; verify policy activation, disclosure history, and clinical records."
+}
+'@
+$response = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/v1/preauth" `
+  -ContentType "application/json" `
+  -Body $body
+$response | ConvertTo-Json -Depth 10
+
+# Save the returned run ID, then poll until the agent finishes.
+$runId = $response.run_id
+do {
+  Start-Sleep -Seconds 2
+  $status = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/preauth/$runId"
+  Write-Host "Status: $($status.status)"
+} while ($status.status -in @("pending", "processing"))
+$status | ConvertTo-Json -Depth 10
+
+
+
+SAMPLE 40 — DEMO-BLR-025 — Pooja Reddy
+------------------------------------------------------------------------
+Expected route: approve-recommended
+Hospital: BGS Gleneagles Global Hospital Kengeri (Bangalore)
+Procedure: Ureteroscopy with laser lithotripsy
+Note: Day-care urology procedure; policy tenure and hospital network status are satisfactory.
+
+Copy/paste this complete PowerShell block to run this one sample:
+
+$body = @'
+{
+  "request_id": "MANUAL-DEMO-BLR-025",
+  "patient": {
+    "patient_id": "PAT-BLR-001025",
+    "full_name": "Pooja Reddy",
+    "date_of_birth": "1989-03-22",
+    "gender": "male",
+    "age_at_admission": 37
+  },
+  "policy": {
+    "policy_number": "SH-BLR-100025",
+    "policy_holder_name": "Pooja Reddy",
+    "policy_inception_date": "2025-07-07",
+    "policy_expiry_date": "2027-10-20",
+    "sum_insured_inr": 500000,
+    "cumulative_bonus_inr": 0,
+    "prior_claims_inr": 45000
+  },
+  "hospital": {
+    "hospital_id": "HOSP-BLR-006",
+    "hospital_name": "BGS Gleneagles Global Hospital Kengeri",
+    "rohini_id": "ROH-BLR-20006",
+    "is_network_hospital": true,
+    "city": "Bangalore",
+    "state": "Karnataka"
+  },
+  "medical": {
+    "primary_diagnosis": "Ureteric calculus",
+    "icd10_code": "N20.0",
+    "procedure_name": "Ureteroscopy with laser lithotripsy",
+    "admission_date": "2026-11-03",
+    "expected_discharge_date": "2026-11-04",
+    "admission_type": "day_care",
+    "estimated_cost_inr": 140000,
+    "pre_existing_conditions": [],
+    "treating_physician": "Dr. Vivek Rangan, MCh Urology"
+  },
+  "free_text_notes": "Day-care urology procedure; policy tenure and hospital network status are satisfactory."
+}
+'@
+$response = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/v1/preauth" `
+  -ContentType "application/json" `
+  -Body $body
+$response | ConvertTo-Json -Depth 10
+
+# Save the returned run ID, then poll until the agent finishes.
+$runId = $response.run_id
+do {
+  Start-Sleep -Seconds 2
+  $status = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/preauth/$runId"
+  Write-Host "Status: $($status.status)"
+} while ($status.status -in @("pending", "processing"))
+$status | ConvertTo-Json -Depth 10
+
+
+
+SAMPLE 41 — DEMO-BLR-026 — Raghav Joshi
+------------------------------------------------------------------------
+Expected route: medical-review
+Hospital: Sakra World Hospital Devarabisanahalli (Bangalore)
+Procedure: Transurethral resection of prostate
+Note: Review age-specific disease waiting period and prior conservative management before approval.
+
+Copy/paste this complete PowerShell block to run this one sample:
+
+$body = @'
+{
+  "request_id": "MANUAL-DEMO-BLR-026",
+  "patient": {
+    "patient_id": "PAT-BLR-001026",
+    "full_name": "Raghav Joshi",
+    "date_of_birth": "1959-04-25",
+    "gender": "male",
+    "age_at_admission": 67
+  },
+  "policy": {
+    "policy_number": "SH-BLR-100026",
+    "policy_holder_name": "Raghav Joshi",
+    "policy_inception_date": "2025-05-18",
+    "policy_expiry_date": "2027-10-27",
+    "sum_insured_inr": 500000,
+    "cumulative_bonus_inr": 0,
+    "prior_claims_inr": 0
+  },
+  "hospital": {
+    "hospital_id": "HOSP-BLR-007",
+    "hospital_name": "Sakra World Hospital Devarabisanahalli",
+    "rohini_id": "ROH-BLR-20007",
+    "is_network_hospital": true,
+    "city": "Bangalore",
+    "state": "Karnataka"
+  },
+  "medical": {
+    "primary_diagnosis": "Benign prostatic hyperplasia",
+    "icd10_code": "N40.1",
+    "procedure_name": "Transurethral resection of prostate",
+    "admission_date": "2026-10-30",
+    "expected_discharge_date": "2026-11-02",
+    "admission_type": "planned_surgical",
+    "estimated_cost_inr": 185000,
+    "pre_existing_conditions": [
+      "Hypertension"
+    ],
+    "treating_physician": "Dr. Suresh Rao, MCh Urology"
+  },
+  "free_text_notes": "Review age-specific disease waiting period and prior conservative management before approval."
+}
+'@
+$response = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/v1/preauth" `
+  -ContentType "application/json" `
+  -Body $body
+$response | ConvertTo-Json -Depth 10
+
+# Save the returned run ID, then poll until the agent finishes.
+$runId = $response.run_id
+do {
+  Start-Sleep -Seconds 2
+  $status = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/preauth/$runId"
+  Write-Host "Status: $($status.status)"
+} while ($status.status -in @("pending", "processing"))
+$status | ConvertTo-Json -Depth 10
+
+
+
+SAMPLE 42 — DEMO-BLR-027 — Sahana Murthy
+------------------------------------------------------------------------
+Expected route: approve-recommended
+Hospital: Sparsh Hospital Infantry Road (Bangalore)
+Procedure: Laparoscopic hysterectomy
+Note: Waiting period is satisfied; obtain routine pre-operative reports and admission estimate.
+
+Copy/paste this complete PowerShell block to run this one sample:
+
+$body = @'
+{
+  "request_id": "MANUAL-DEMO-BLR-027",
+  "patient": {
+    "patient_id": "PAT-BLR-001027",
+    "full_name": "Sahana Murthy",
+    "date_of_birth": "1980-05-01",
+    "gender": "female",
+    "age_at_admission": 46
+  },
+  "policy": {
+    "policy_number": "SH-BLR-100027",
+    "policy_holder_name": "Sahana Murthy",
+    "policy_inception_date": "2024-08-11",
+    "policy_expiry_date": "2027-11-03",
+    "sum_insured_inr": 300000,
+    "cumulative_bonus_inr": 0,
+    "prior_claims_inr": 0
+  },
+  "hospital": {
+    "hospital_id": "HOSP-BLR-008",
+    "hospital_name": "Sparsh Hospital Infantry Road",
+    "rohini_id": "ROH-BLR-20008",
+    "is_network_hospital": true,
+    "city": "Bangalore",
+    "state": "Karnataka"
+  },
+  "medical": {
+    "primary_diagnosis": "Uterine leiomyoma",
+    "icd10_code": "D25.9",
+    "procedure_name": "Laparoscopic hysterectomy",
+    "admission_date": "2026-10-31",
+    "expected_discharge_date": "2026-11-03",
+    "admission_type": "planned_surgical",
+    "estimated_cost_inr": 235000,
+    "pre_existing_conditions": [
+      "Iron deficiency anaemia"
+    ],
+    "treating_physician": "Dr. Shalini Joseph, MD Obstetrics and Gynaecology"
+  },
+  "free_text_notes": "Waiting period is satisfied; obtain routine pre-operative reports and admission estimate."
+}
+'@
+$response = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/v1/preauth" `
+  -ContentType "application/json" `
+  -Body $body
+$response | ConvertTo-Json -Depth 10
+
+# Save the returned run ID, then poll until the agent finishes.
+$runId = $response.run_id
+do {
+  Start-Sleep -Seconds 2
+  $status = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/preauth/$runId"
+  Write-Host "Status: $($status.status)"
+} while ($status.status -in @("pending", "processing"))
+$status | ConvertTo-Json -Depth 10
+
+
+
+SAMPLE 43 — DEMO-BLR-028 — Tejas Kulkarni
+------------------------------------------------------------------------
+Expected route: medical-review
+Hospital: NIMHANS Hosur Road (Bangalore)
+Procedure: Inpatient pneumonia management
+Note: Policy is within the initial 30-day period; emergency admission requires clinical validation.
+
+Copy/paste this complete PowerShell block to run this one sample:
+
+$body = @'
+{
+  "request_id": "MANUAL-DEMO-BLR-028",
+  "patient": {
+    "patient_id": "PAT-BLR-001028",
+    "full_name": "Tejas Kulkarni",
+    "date_of_birth": "1992-06-04",
+    "gender": "female",
+    "age_at_admission": 34
+  },
+  "policy": {
+    "policy_number": "SH-BLR-100028",
+    "policy_holder_name": "Tejas Kulkarni",
+    "policy_inception_date": "2026-10-06",
+    "policy_expiry_date": "2027-11-10",
+    "sum_insured_inr": 500000,
+    "cumulative_bonus_inr": 50000,
+    "prior_claims_inr": 0
+  },
+  "hospital": {
+    "hospital_id": "HOSP-BLR-009",
+    "hospital_name": "NIMHANS Hosur Road",
+    "rohini_id": null,
+    "is_network_hospital": false,
+    "city": "Bangalore",
+    "state": "Karnataka"
+  },
+  "medical": {
+    "primary_diagnosis": "Community-acquired pneumonia",
+    "icd10_code": "J18.9",
+    "procedure_name": "Inpatient pneumonia management",
+    "admission_date": "2026-11-01",
+    "expected_discharge_date": "2026-11-05",
+    "admission_type": "emergency",
+    "estimated_cost_inr": 88000,
+    "pre_existing_conditions": [
+      "Asthma"
+    ],
+    "treating_physician": "Dr. Ritu Sharma, MD Pulmonary Medicine"
+  },
+  "free_text_notes": "Policy is within the initial 30-day period; emergency admission requires clinical validation."
+}
+'@
+$response = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/v1/preauth" `
+  -ContentType "application/json" `
+  -Body $body
+$response | ConvertTo-Json -Depth 10
+
+# Save the returned run ID, then poll until the agent finishes.
+$runId = $response.run_id
+do {
+  Start-Sleep -Seconds 2
+  $status = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/preauth/$runId"
+  Write-Host "Status: $($status.status)"
+} while ($status.status -in @("pending", "processing"))
+$status | ConvertTo-Json -Depth 10
+
+
+
+SAMPLE 44 — DEMO-BLR-029 — Usha Pai
+------------------------------------------------------------------------
+Expected route: query-to-hospital
+Hospital: NIMHANS Hosur Road (Bangalore)
+Procedure: Hip fracture fixation
+Note: Non-network admission — request emergency certificate, implant details, discharge summary, and original bills.
+
+Copy/paste this complete PowerShell block to run this one sample:
+
+$body = @'
+{
+  "request_id": "MANUAL-DEMO-BLR-029",
+  "patient": {
+    "patient_id": "PAT-BLR-001029",
+    "full_name": "Usha Pai",
+    "date_of_birth": "1952-07-07",
+    "gender": "female",
+    "age_at_admission": 74
+  },
+  "policy": {
+    "policy_number": "SH-BLR-100029",
+    "policy_holder_name": "Usha Pai",
+    "policy_inception_date": "2025-10-30",
+    "policy_expiry_date": "2027-11-17",
+    "sum_insured_inr": 500000,
+    "cumulative_bonus_inr": 0,
+    "prior_claims_inr": 0
+  },
+  "hospital": {
+    "hospital_id": "HOSP-BLR-009",
+    "hospital_name": "NIMHANS Hosur Road",
+    "rohini_id": null,
+    "is_network_hospital": false,
+    "city": "Bangalore",
+    "state": "Karnataka"
+  },
+  "medical": {
+    "primary_diagnosis": "Fracture of neck of femur",
+    "icd10_code": "S72.0",
+    "procedure_name": "Hip fracture fixation",
+    "admission_date": "2026-11-02",
+    "expected_discharge_date": "2026-11-09",
+    "admission_type": "emergency",
+    "estimated_cost_inr": 315000,
+    "pre_existing_conditions": [
+      "Osteoporosis"
+    ],
+    "treating_physician": "Dr. Ajay Kulkarni, MS Orthopaedics"
+  },
+  "free_text_notes": "Non-network admission — request emergency certificate, implant details, discharge summary, and original bills."
+}
+'@
+$response = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/v1/preauth" `
+  -ContentType "application/json" `
+  -Body $body
+$response | ConvertTo-Json -Depth 10
+
+# Save the returned run ID, then poll until the agent finishes.
+$runId = $response.run_id
+do {
+  Start-Sleep -Seconds 2
+  $status = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/preauth/$runId"
+  Write-Host "Status: $($status.status)"
+} while ($status.status -in @("pending", "processing"))
+$status | ConvertTo-Json -Depth 10
+
+
+
+SAMPLE 45 — DEMO-BLR-030 — Vikram Das
+------------------------------------------------------------------------
+Expected route: medical-review
+Hospital: Narayana Health City Bommasandra (Bangalore)
+Procedure: Pars plana vitrectomy
+Note: Ophthalmic surgery requires retinal imaging, operative plan, and confirmation of covered indication.
+
+Copy/paste this complete PowerShell block to run this one sample:
+
+$body = @'
+{
+  "request_id": "MANUAL-DEMO-BLR-030",
+  "patient": {
+    "patient_id": "PAT-BLR-001030",
+    "full_name": "Vikram Das",
+    "date_of_birth": "1968-08-10",
+    "gender": "male",
+    "age_at_admission": 58
+  },
+  "policy": {
+    "policy_number": "SH-BLR-100030",
+    "policy_holder_name": "Vikram Das",
+    "policy_inception_date": "2024-12-09",
+    "policy_expiry_date": "2027-11-24",
+    "sum_insured_inr": 300000,
+    "cumulative_bonus_inr": 0,
+    "prior_claims_inr": 45000
+  },
+  "hospital": {
+    "hospital_id": "HOSP-BLR-002",
+    "hospital_name": "Narayana Health City Bommasandra",
+    "rohini_id": "ROH-BLR-20002",
+    "is_network_hospital": true,
+    "city": "Bangalore",
+    "state": "Karnataka"
+  },
+  "medical": {
+    "primary_diagnosis": "Retinal detachment",
+    "icd10_code": "H33.2",
+    "procedure_name": "Pars plana vitrectomy",
+    "admission_date": "2026-11-03",
+    "expected_discharge_date": "2026-11-05",
+    "admission_type": "planned_surgical",
+    "estimated_cost_inr": 200000,
+    "pre_existing_conditions": [
+      "Type 2 Diabetes"
+    ],
+    "treating_physician": "Dr. Kavya Nair, DNB Ophthalmology"
+  },
+  "free_text_notes": "Ophthalmic surgery requires retinal imaging, operative plan, and confirmation of covered indication."
+}
+'@
+$response = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/v1/preauth" `
+  -ContentType "application/json" `
+  -Body $body
+$response | ConvertTo-Json -Depth 10
+
+# Save the returned run ID, then poll until the agent finishes.
+$runId = $response.run_id
+do {
+  Start-Sleep -Seconds 2
+  $status = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/preauth/$runId"
+  Write-Host "Status: $($status.status)"
+} while ($status.status -in @("pending", "processing"))
+$status | ConvertTo-Json -Depth 10
+
+
+
+SAMPLE 46 — DEMO-BLR-031 — Waseem Ahmed
+------------------------------------------------------------------------
+Expected route: approve-recommended
+Hospital: Fortis Hospital Bannerghatta Road (Bangalore)
+Procedure: Laparoscopic appendicectomy
+Note: Emergency admission — initial waiting period waived; no specific procedure wait applies.
+
+Copy/paste this complete PowerShell block to run this one sample:
+
+$body = @'
+{
+  "request_id": "MANUAL-DEMO-BLR-031",
+  "patient": {
+    "patient_id": "PAT-BLR-001031",
+    "full_name": "Waseem Ahmed",
+    "date_of_birth": "1997-09-13",
+    "gender": "male",
+    "age_at_admission": 29
+  },
+  "policy": {
+    "policy_number": "SH-BLR-100031",
+    "policy_holder_name": "Waseem Ahmed",
+    "policy_inception_date": "2025-09-05",
+    "policy_expiry_date": "2027-12-01",
+    "sum_insured_inr": 500000,
+    "cumulative_bonus_inr": 0,
+    "prior_claims_inr": 0
+  },
+  "hospital": {
+    "hospital_id": "HOSP-BLR-003",
+    "hospital_name": "Fortis Hospital Bannerghatta Road",
+    "rohini_id": "ROH-BLR-20003",
+    "is_network_hospital": true,
+    "city": "Bangalore",
+    "state": "Karnataka"
+  },
+  "medical": {
+    "primary_diagnosis": "Acute appendicitis",
+    "icd10_code": "K35.8",
+    "procedure_name": "Laparoscopic appendicectomy",
+    "admission_date": "2026-10-30",
+    "expected_discharge_date": "2026-11-02",
+    "admission_type": "emergency",
+    "estimated_cost_inr": 87000,
+    "pre_existing_conditions": [],
+    "treating_physician": "Dr. Anil Menon, MS General Surgery"
+  },
+  "free_text_notes": "Emergency admission — initial waiting period waived; no specific procedure wait applies."
+}
+'@
+$response = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/v1/preauth" `
+  -ContentType "application/json" `
+  -Body $body
+$response | ConvertTo-Json -Depth 10
+
+# Save the returned run ID, then poll until the agent finishes.
+$runId = $response.run_id
+do {
+  Start-Sleep -Seconds 2
+  $status = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/preauth/$runId"
+  Write-Host "Status: $($status.status)"
+} while ($status.status -in @("pending", "processing"))
+$status | ConvertTo-Json -Depth 10
+
+
+
+SAMPLE 47 — DEMO-BLR-032 — Xavier Fernandes
+------------------------------------------------------------------------
+Expected route: approve-recommended
+Hospital: Columbia Asia Hospital Hebbal (Bangalore)
+Procedure: Laparoscopic cholecystectomy
+Note: Policy tenure exceeds the applicable waiting period; network cashless pathway available.
+
+Copy/paste this complete PowerShell block to run this one sample:
+
+$body = @'
+{
+  "request_id": "MANUAL-DEMO-BLR-032",
+  "patient": {
+    "patient_id": "PAT-BLR-001032",
+    "full_name": "Xavier Fernandes",
+    "date_of_birth": "1983-10-16",
+    "gender": "female",
+    "age_at_admission": 43
+  },
+  "policy": {
+    "policy_number": "SH-BLR-100032",
+    "policy_holder_name": "Xavier Fernandes",
+    "policy_inception_date": "2024-09-30",
+    "policy_expiry_date": "2027-12-08",
+    "sum_insured_inr": 500000,
+    "cumulative_bonus_inr": 50000,
+    "prior_claims_inr": 0
+  },
+  "hospital": {
+    "hospital_id": "HOSP-BLR-004",
+    "hospital_name": "Columbia Asia Hospital Hebbal",
+    "rohini_id": "ROH-BLR-20004",
+    "is_network_hospital": true,
+    "city": "Bangalore",
+    "state": "Karnataka"
+  },
+  "medical": {
+    "primary_diagnosis": "Symptomatic gallstones",
+    "icd10_code": "K80.2",
+    "procedure_name": "Laparoscopic cholecystectomy",
+    "admission_date": "2026-10-31",
+    "expected_discharge_date": "2026-11-02",
+    "admission_type": "planned_surgical",
+    "estimated_cost_inr": 110000,
+    "pre_existing_conditions": [
+      "Dyslipidemia"
+    ],
+    "treating_physician": "Dr. Meera Iyer, MS General Surgery"
+  },
+  "free_text_notes": "Policy tenure exceeds the applicable waiting period; network cashless pathway available."
+}
+'@
+$response = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/v1/preauth" `
+  -ContentType "application/json" `
+  -Body $body
+$response | ConvertTo-Json -Depth 10
+
+# Save the returned run ID, then poll until the agent finishes.
+$runId = $response.run_id
+do {
+  Start-Sleep -Seconds 2
+  $status = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/preauth/$runId"
+  Write-Host "Status: $($status.status)"
+} while ($status.status -in @("pending", "processing"))
+$status | ConvertTo-Json -Depth 10
+
+
+
+SAMPLE 48 — DEMO-BLR-033 — Yashaswini Rao
+------------------------------------------------------------------------
+Expected route: medical-review
+Hospital: Aster CMI Hospital Hebbal (Bangalore)
+Procedure: Lumbar microdiscectomy
+Note: Spinal procedure requires review of imaging, conservative treatment history, and medical necessity.
+
+Copy/paste this complete PowerShell block to run this one sample:
+
+$body = @'
+{
+  "request_id": "MANUAL-DEMO-BLR-033",
+  "patient": {
+    "patient_id": "PAT-BLR-001033",
+    "full_name": "Yashaswini Rao",
+    "date_of_birth": "1977-11-19",
+    "gender": "male",
+    "age_at_admission": 49
+  },
+  "policy": {
+    "policy_number": "SH-BLR-100033",
+    "policy_holder_name": "Yashaswini Rao",
+    "policy_inception_date": "2025-02-27",
+    "policy_expiry_date": "2027-12-15",
+    "sum_insured_inr": 300000,
+    "cumulative_bonus_inr": 0,
+    "prior_claims_inr": 0
+  },
+  "hospital": {
+    "hospital_id": "HOSP-BLR-005",
+    "hospital_name": "Aster CMI Hospital Hebbal",
+    "rohini_id": "ROH-BLR-20005",
+    "is_network_hospital": true,
+    "city": "Bangalore",
+    "state": "Karnataka"
+  },
+  "medical": {
+    "primary_diagnosis": "Lumbar disc prolapse",
+    "icd10_code": "M51.2",
+    "procedure_name": "Lumbar microdiscectomy",
+    "admission_date": "2026-11-01",
+    "expected_discharge_date": "2026-11-05",
+    "admission_type": "planned_surgical",
+    "estimated_cost_inr": 270000,
+    "pre_existing_conditions": [
+      "Chronic low back pain"
+    ],
+    "treating_physician": "Dr. Nikhil Bhat, MS Orthopaedics"
+  },
+  "free_text_notes": "Spinal procedure requires review of imaging, conservative treatment history, and medical necessity."
+}
+'@
+$response = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/v1/preauth" `
+  -ContentType "application/json" `
+  -Body $body
+$response | ConvertTo-Json -Depth 10
+
+# Save the returned run ID, then poll until the agent finishes.
+$runId = $response.run_id
+do {
+  Start-Sleep -Seconds 2
+  $status = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/preauth/$runId"
+  Write-Host "Status: $($status.status)"
+} while ($status.status -in @("pending", "processing"))
+$status | ConvertTo-Json -Depth 10
+
+
+
+SAMPLE 49 — DEMO-BLR-034 — Zubin Mathew
+------------------------------------------------------------------------
+Expected route: medical-review
+Hospital: BGS Gleneagles Global Hospital Kengeri (Bangalore)
+Procedure: Coronary angioplasty with stent
+Note: Emergency cardiac admission; verify policy activation, disclosure history, and clinical records.
+
+Copy/paste this complete PowerShell block to run this one sample:
+
+$body = @'
+{
+  "request_id": "MANUAL-DEMO-BLR-034",
+  "patient": {
+    "patient_id": "PAT-BLR-001034",
+    "full_name": "Zubin Mathew",
+    "date_of_birth": "1965-12-22",
+    "gender": "female",
+    "age_at_admission": 61
+  },
+  "policy": {
+    "policy_number": "SH-BLR-100034",
+    "policy_holder_name": "Zubin Mathew",
+    "policy_inception_date": "2026-08-01",
+    "policy_expiry_date": "2027-12-22",
+    "sum_insured_inr": 500000,
+    "cumulative_bonus_inr": 0,
+    "prior_claims_inr": 0
+  },
+  "hospital": {
+    "hospital_id": "HOSP-BLR-006",
+    "hospital_name": "BGS Gleneagles Global Hospital Kengeri",
+    "rohini_id": "ROH-BLR-20006",
+    "is_network_hospital": true,
+    "city": "Bangalore",
+    "state": "Karnataka"
+  },
+  "medical": {
+    "primary_diagnosis": "Acute myocardial infarction",
+    "icd10_code": "I21.9",
+    "procedure_name": "Coronary angioplasty with stent",
+    "admission_date": "2026-11-02",
+    "expected_discharge_date": "2026-11-07",
+    "admission_type": "emergency",
+    "estimated_cost_inr": 395000,
+    "pre_existing_conditions": [
+      "Hypertension",
+      "Type 2 Diabetes"
+    ],
+    "treating_physician": "Dr. Farah Khan, DM Cardiology"
+  },
+  "free_text_notes": "Emergency cardiac admission; verify policy activation, disclosure history, and clinical records."
+}
+'@
+$response = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/v1/preauth" `
+  -ContentType "application/json" `
+  -Body $body
+$response | ConvertTo-Json -Depth 10
+
+# Save the returned run ID, then poll until the agent finishes.
+$runId = $response.run_id
+do {
+  Start-Sleep -Seconds 2
+  $status = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/preauth/$runId"
+  Write-Host "Status: $($status.status)"
+} while ($status.status -in @("pending", "processing"))
+$status | ConvertTo-Json -Depth 10
+
+
+
+SAMPLE 50 — DEMO-BLR-035 — Aarav Kapoor
+------------------------------------------------------------------------
+Expected route: approve-recommended
+Hospital: Sakra World Hospital Devarabisanahalli (Bangalore)
+Procedure: Ureteroscopy with laser lithotripsy
+Note: Day-care urology procedure; policy tenure and hospital network status are satisfactory.
+
+Copy/paste this complete PowerShell block to run this one sample:
+
+$body = @'
+{
+  "request_id": "MANUAL-DEMO-BLR-035",
+  "patient": {
+    "patient_id": "PAT-BLR-001035",
+    "full_name": "Aarav Kapoor",
+    "date_of_birth": "1989-01-25",
+    "gender": "male",
+    "age_at_admission": 37
+  },
+  "policy": {
+    "policy_number": "SH-BLR-100035",
+    "policy_holder_name": "Aarav Kapoor",
+    "policy_inception_date": "2025-07-07",
+    "policy_expiry_date": "2027-12-29",
+    "sum_insured_inr": 500000,
+    "cumulative_bonus_inr": 0,
+    "prior_claims_inr": 45000
+  },
+  "hospital": {
+    "hospital_id": "HOSP-BLR-007",
+    "hospital_name": "Sakra World Hospital Devarabisanahalli",
+    "rohini_id": "ROH-BLR-20007",
+    "is_network_hospital": true,
+    "city": "Bangalore",
+    "state": "Karnataka"
+  },
+  "medical": {
+    "primary_diagnosis": "Ureteric calculus",
+    "icd10_code": "N20.0",
+    "procedure_name": "Ureteroscopy with laser lithotripsy",
+    "admission_date": "2026-11-03",
+    "expected_discharge_date": "2026-11-04",
+    "admission_type": "day_care",
+    "estimated_cost_inr": 150000,
+    "pre_existing_conditions": [],
+    "treating_physician": "Dr. Vivek Rangan, MCh Urology"
+  },
+  "free_text_notes": "Day-care urology procedure; policy tenure and hospital network status are satisfactory."
+}
+'@
+$response = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8000/api/v1/preauth" `
+  -ContentType "application/json" `
+  -Body $body
+$response | ConvertTo-Json -Depth 10
+
+# Save the returned run ID, then poll until the agent finishes.
+$runId = $response.run_id
+do {
+  Start-Sleep -Seconds 2
+  $status = Invoke-RestMethod -Uri "http://localhost:8000/api/v1/preauth/$runId"
+  Write-Host "Status: $($status.status)"
+} while ($status.status -in @("pending", "processing"))
+$status | ConvertTo-Json -Depth 10
+

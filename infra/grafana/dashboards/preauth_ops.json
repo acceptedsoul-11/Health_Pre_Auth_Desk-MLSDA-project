@@ -1,0 +1,131 @@
+{
+  "__inputs": [],
+  "__requires": [
+    {"type": "grafana", "id": "grafana", "name": "Grafana", "version": "11.0.0"},
+    {"type": "datasource", "id": "prometheus", "name": "Prometheus", "version": "1.0.0"}
+  ],
+  "annotations": {"list": []},
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {"color": {"mode": "palette-classic"}, "unit": "reqps"}
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "id": 1,
+      "options": {"legend": {"calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom"}},
+      "targets": [
+        {
+          "expr": "rate(preauth_runs_submitted_total[1m])",
+          "legendFormat": "Submitted / sec",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(preauth_runs_completed_total[1m])",
+          "legendFormat": "Completed / sec",
+          "refId": "B"
+        }
+      ],
+      "title": "Throughput — Submissions vs Completions",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "ms", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 2000}, {"color": "red", "value": 5000}]}}},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "id": 2,
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, rate(preauth_pipeline_duration_seconds_bucket[5m])) * 1000",
+          "legendFormat": "p95 latency (ms)",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.50, rate(preauth_pipeline_duration_seconds_bucket[5m])) * 1000",
+          "legendFormat": "p50 latency (ms)",
+          "refId": "B"
+        }
+      ],
+      "title": "Pipeline Latency p50 / p95",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"mappings": [{"options": {"0": {"color": "green", "index": 0, "text": "CLOSED"}, "1": {"color": "yellow", "index": 1, "text": "HALF-OPEN"}, "2": {"color": "red", "index": 2, "text": "OPEN"}}, "type": "value"}], "thresholds": {"mode": "absolute", "steps": [{"color": "green"}, {"color": "red", "value": 2}]}}},
+      "gridPos": {"h": 4, "w": 4, "x": 0, "y": 8},
+      "id": 3,
+      "targets": [{"expr": "preauth_circuit_breaker_state{breaker_name=\"llm_provider\"}", "refId": "A"}],
+      "title": "LLM Circuit Breaker",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "short", "thresholds": {"mode": "absolute", "steps": [{"color": "green"}, {"color": "yellow", "value": 10}, {"color": "red", "value": 20}]}}},
+      "gridPos": {"h": 4, "w": 4, "x": 4, "y": 8},
+      "id": 4,
+      "targets": [{"expr": "preauth_queue_depth", "refId": "A"}],
+      "title": "Queue Depth",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "percentunit", "thresholds": {"mode": "absolute", "steps": [{"color": "green"}, {"color": "red", "value": 0.01}]}}},
+      "gridPos": {"h": 4, "w": 4, "x": 8, "y": 8},
+      "id": 5,
+      "targets": [{"expr": "rate(preauth_runs_failed_total[5m]) / (rate(preauth_runs_submitted_total[5m]) + 0.001)", "refId": "A"}],
+      "title": "Error Rate",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "short"}},
+      "gridPos": {"h": 4, "w": 12, "x": 12, "y": 8},
+      "id": 6,
+      "options": {"pieType": "donut", "legend": {"displayMode": "table", "placement": "right"}},
+      "targets": [
+        {"expr": "increase(preauth_runs_completed_total{outcome=\"approve-recommended\"}[1h])", "legendFormat": "Approve Recommended", "refId": "A"},
+        {"expr": "increase(preauth_runs_completed_total{outcome=\"medical-review\"}[1h])", "legendFormat": "Medical Review", "refId": "B"},
+        {"expr": "increase(preauth_runs_completed_total{outcome=\"query-to-hospital\"}[1h])", "legendFormat": "Query to Hospital", "refId": "C"}
+      ],
+      "title": "Outcomes (last 1h)",
+      "type": "piechart"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "short"}},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
+      "id": 7,
+      "targets": [
+        {"expr": "rate(preauth_tool_calls_total[5m])", "legendFormat": "{{tool_name}}", "refId": "A"}
+      ],
+      "title": "Agent Tool Call Rate by Tool",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "short"}},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
+      "id": 8,
+      "targets": [
+        {"expr": "preauth_guardrail_violations_total", "legendFormat": "Guardrail Violations", "refId": "A"},
+        {"expr": "preauth_quarantined_total", "legendFormat": "Quarantined Requests", "refId": "B"}
+      ],
+      "title": "Security Events",
+      "type": "timeseries"
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["preauth", "health-insurance", "mlsda"],
+  "templating": {"list": []},
+  "time": {"from": "now-1h", "to": "now"},
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Pre-Authorization Desk — Operations",
+  "uid": "preauth-ops-001",
+  "version": 1
+}
