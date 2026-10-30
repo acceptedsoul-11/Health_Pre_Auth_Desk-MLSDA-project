@@ -10,6 +10,7 @@ An asynchronous multi-agent pre-authorization service for synthetic health-insur
 
 The system never authorizes an admission automatically. It produces a cited coverage recommendation for a medical officer to review.
 <img width="1915" height="932" alt="image" src="https://github.com/user-attachments/assets/4734998f-763f-4041-bda8-a1d506b89f1e" />
+<img width="1917" height="1078" alt="image" src="https://github.com/user-attachments/assets/16a3efaf-fa87-40e6-8683-ea6d541fba9f" />
 
 # NOTE:(A live demo video will be made available soon,post review.)
 ## 1. Application overview
