@@ -1,11 +1,17 @@
 # Health Insurance Pre-Authorization Desk
 
+## Contributors
+-PES1UG24AM240
+-PES1UG24AM241
+-PES1UG24AM251
+-PES1UG24AM251
+
 An asynchronous multi-agent pre-authorization service for synthetic health-insurance requests. The system validates a request, retrieves relevant policy clauses, verifies the recommendation, and routes the case to approve-recommended, query-to-hospital, or medical-review.
 
 The system never authorizes an admission automatically. It produces a cited coverage recommendation for a medical officer to review.
+<img width="1915" height="932" alt="image" src="https://github.com/user-attachments/assets/4734998f-763f-4041-bda8-a1d506b89f1e" />
 
-> Use synthetic patient data only. Do not enter real patient information.
-
+# NOTE:(A live demo video will be made available soon,post review.)
 ## 1. Application overview
 
 | Component | Purpose | URL |
@@ -259,31 +265,7 @@ Targets:
 - Complete run p95 below 5 seconds under the declared test profile
 - Status lookup p95 below 200 ms
 - Error rate below 1% at 20 concurrent users
-
-<!-- Screenshot slot: docs/screenshots/10-load-test-summary.png -->
-
-## 15. Screenshot plan: application features and performance metrics only
-
-Store screenshots in docs/screenshots/. Capture only synthetic data and redact secrets. These slots are for the report or presentation.
-
-| Suggested file | Capture | Use in report/deck |
-|---|---|---|
-| 01-submit-page.png | Submit page with a synthetic request | Application feature: request intake |
-| 02-live-status-result.png | Completed status page with route, citations, escalation, and Run ID | Application feature: asynchronous result |
-| 03-live-records-dashboard.png | Seeded Live Records page | Application feature: demo browsing |
-| 04-cataract-critical-case.png | Cataract case routed to medical-review with waiting-period citation | Application feature: difficult case |
-| 05-feedback-panel.png | Reviewer feedback controls after a result | Application feature: human review |
-| 07-grafana-operations.png | Grafana throughput, p95, queue, and error panels | Performance metrics: dashboard |
-| 08-prometheus-targets.png | Prometheus Targets page | Performance metrics: scrape health |
-| 09-jaeger-trace.png | Jaeger trace for one Run ID | Performance/observability: end-to-end trace |
-| 10-load-test-summary.png | Locust RPS, p50, p95, and error summary | Performance metrics: load test |
-
-Suggested report order:
-
-~~~text
-Submit page -> Live status -> Critical case -> Flower -> Grafana
-             -> Prometheus targets -> Jaeger trace -> Locust summary
-~~~
+  
 
 ## 16. Stop and reset commands
 
